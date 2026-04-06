@@ -5,6 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Stack, router } from 'expo-router';
 import { useTheme } from './_layout';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 const PANEL_HEIGHT = 300; 
@@ -76,6 +77,31 @@ export default function App() {
 
   const overlayOpacity = useRef(new Animated.Value(0)).current;
   const panelTranslateY = useRef(new Animated.Value(PANEL_HEIGHT)).current;
+
+  useEffect(() => {
+    const loadTasks = async () => {
+      try {
+        const savedTasks = await AsyncStorage.getItem('@checklendar_tasks');
+        if (savedTasks !== null) {
+          setTasks(JSON.parse(savedTasks));
+        }
+      } catch (e) {
+        console.error('데이터를 불러오는데 실패했습니다.', e);
+      }
+    };
+    loadTasks();
+  }, []);
+
+  useEffect(() => {
+    const saveTasks = async () => {
+      try {
+        await AsyncStorage.setItem('@checklendar_tasks', JSON.stringify(tasks));
+      } catch (e) {
+        console.error('데이터 저장에 실패했습니다.', e);
+      }
+    };
+    saveTasks();
+  }, [tasks]);
 
   useEffect(() => {
     if (isMenuVisible) {
