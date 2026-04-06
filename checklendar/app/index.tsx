@@ -7,43 +7,43 @@ import { Stack, router } from 'expo-router';
 import { useTheme } from './_layout';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+// ============================================================================
+// [상수 정의]
+// ============================================================================
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
-const PANEL_HEIGHT = 300; 
+const PANEL_HEIGHT = 300; // 하단 설정 메뉴(바텀 시트)의 높이
 
-// --- [💡 내부 컴포넌트: 애니메이션이 적용된 할 일 아이템] ---
+
+// ============================================================================
+// [개별 할 일 아이템 컴포넌트]
+// 할 일을 완료했을 때 체크 표시가 뜨고 서서히 사라지는 애니메이션을 담당합니다.
+// ============================================================================
 const AnimatedTaskItem = ({ item, theme, onComplete }) => {
-  const [isDone, setIsDone] = useState(false); // 체크 여부
-  const fadeAnim = useRef(new Animated.Value(1)).current; // 투명도 애니메이션
+  const [isDone, setIsDone] = useState(false);
+  const fadeAnim = useRef(new Animated.Value(1)).current; 
 
   const handlePress = () => {
-    setIsDone(true); // 1. 즉시 체크 표시로 변경
+    setIsDone(true); 
     
-    // 2. 부드럽게 사라지는 애니메이션 실행
+    // 투명도를 1에서 0으로 0.4초 동안 변경 후 삭제 콜백 실행
     Animated.timing(fadeAnim, {
       toValue: 0,
       duration: 400,
       useNativeDriver: true,
     }).start(() => {
-      onComplete(item.id); // 3. 애니메이션 종료 후 실제 데이터 삭제
+      onComplete(item.id); 
     });
   };
 
   return (
     <Animated.View style={[styles.todoItem, { backgroundColor: theme.card, opacity: fadeAnim }]}>
-      <TouchableOpacity 
-        activeOpacity={0.7}
-        onPress={handlePress}
-        style={styles.todoContent}
-      >
-        {/* 왼쪽: 할 일 내용 */}
+      <TouchableOpacity activeOpacity={0.7} onPress={handlePress} style={styles.todoContent}>
         <View style={{ flex: 1 }}>
           <Text style={[styles.todoText, { color: theme.text, textDecorationLine: isDone ? 'line-through' : 'none' }]}>
             {item.text}
           </Text>
           <Text style={[styles.todoRange, { color: theme.subText }]}>{item.range[0]} ~ {item.range[1]}</Text>
         </View>
-
-        {/* 오른쪽: 체크 아이콘 (위치 변경됨) */}
         <Ionicons 
           name={isDone ? "checkmark-circle" : "ellipse-outline"} 
           size={26} 
@@ -55,17 +55,26 @@ const AnimatedTaskItem = ({ item, theme, onComplete }) => {
   );
 };
 
-export default function App() {
-  const { isDarkMode } = useTheme(); 
-  const [viewDate, setViewDate] = useState(new Date().toISOString().split('T')[0]);
-  const [tasks, setTasks] = useState({});
-  const [isModalVisible, setModalVisible] = useState(false);
-  const [addStartDate, setAddStartDate] = useState(viewDate);
-  const [addEndDate, setAddEndDate] = useState(viewDate);
-  const [isSelecting, setIsSelecting] = useState(false);
-  const [taskText, setTaskText] = useState('');
-  const [isMenuVisible, setMenuVisible] = useState(false);
 
+// ============================================================================
+// [메인 앱 컴포넌트]
+// ============================================================================
+export default function App() {
+  
+  // 1. 전역 테마 및 핵심 상태 관리
+  const { isDarkMode } = useTheme(); 
+  const [viewDate, setViewDate] = useState(new Date().toISOString().split('T')[0]); // 달력에서 선택된 날짜
+  const [tasks, setTasks] = useState({}); // 전체 할 일 데이터 (구조: { 'YYYY-MM-DD': [task1, task2...] })
+  
+  // 2. 모달 및 폼 상태 관리
+  const [isModalVisible, setModalVisible] = useState(false); // 일정 추가 모달 표시 여부
+  const [addStartDate, setAddStartDate] = useState(viewDate); // 새 일정 시작일
+  const [addEndDate, setAddEndDate] = useState(viewDate); // 새 일정 종료일
+  const [isSelecting, setIsSelecting] = useState(false); // 달력 기간 선택 모드 활성화 여부
+  const [taskText, setTaskText] = useState(''); // 입력창 텍스트
+  const [isMenuVisible, setMenuVisible] = useState(false); // 하단 설정 메뉴 표시 여부
+
+  // 3. 다크모드/라이트모드 색상 팔레트 (테마 변경 시에만 재생성)
   const theme = useMemo(() => ({
     bg: isDarkMode ? '#121212' : '#F8F9FA',
     card: isDarkMode ? '#1E1E1E' : '#FFFFFF',
@@ -75,9 +84,15 @@ export default function App() {
     icon: isDarkMode ? '#FFFFFF' : '#333333',
   }), [isDarkMode]);
 
+  // 4. 하단 메뉴 애니메이션 값
   const overlayOpacity = useRef(new Animated.Value(0)).current;
   const panelTranslateY = useRef(new Animated.Value(PANEL_HEIGHT)).current;
 
+  // ----------------------------------------------------------------------------
+  // [데이터 지속성 (Data Persistence)] 로컬 저장소 동기화
+  // ----------------------------------------------------------------------------
+  
+  // 앱 실행 시 기기에 저장된 데이터 불러오기
   useEffect(() => {
     const loadTasks = async () => {
       try {
@@ -92,6 +107,7 @@ export default function App() {
     loadTasks();
   }, []);
 
+  // 할 일(tasks) 데이터가 변경될 때마다 기기에 자동 저장하기
   useEffect(() => {
     const saveTasks = async () => {
       try {
@@ -103,6 +119,11 @@ export default function App() {
     saveTasks();
   }, [tasks]);
 
+  // ----------------------------------------------------------------------------
+  // [애니메이션 제어] 하단 메뉴 열기/닫기
+  // ----------------------------------------------------------------------------
+  
+  // 메뉴 모달이 열릴 때 슬라이드 업 & 배경 어두워짐 효과
   useEffect(() => {
     if (isMenuVisible) {
       Animated.parallel([
@@ -112,6 +133,7 @@ export default function App() {
     }
   }, [isMenuVisible]);
 
+  // 메뉴 모달 닫기
   const handleCloseMenu = useCallback(() => {
     Animated.parallel([
       Animated.timing(overlayOpacity, { toValue: 0, duration: 200, useNativeDriver: true }),
@@ -119,18 +141,11 @@ export default function App() {
     ]).start(() => setMenuVisible(false));
   }, [overlayOpacity, panelTranslateY]);
 
-  // --- [데이터 삭제 로직] ---
-  const deleteTask = useCallback((taskId) => {
-    setTasks(prev => {
-      const updated = { ...prev };
-      Object.keys(updated).forEach(date => {
-        updated[date] = updated[date].filter(t => t.id !== taskId);
-        if (updated[date].length === 0) delete updated[date];
-      });
-      return updated;
-    });
-  }, []);
-
+  // ----------------------------------------------------------------------------
+  // [비즈니스 로직] 할 일 추가, 삭제, 날짜 계산
+  // ----------------------------------------------------------------------------
+  
+  // 날짜 범위(시작일~종료일) 배열 생성기
   const getDatesInRange = useCallback((start, end) => {
     const dates = [];
     let curr = new Date(start);
@@ -142,32 +157,59 @@ export default function App() {
     return dates;
   }, []);
 
+  // 새 일정 저장
   const saveTask = useCallback(() => {
     if (taskText.trim().length === 0) return;
+    
     const range = getDatesInRange(addStartDate, addEndDate);
     const newTask = { id: Date.now().toString(), text: taskText, range: [addStartDate, addEndDate] };
     const updatedTasks = { ...tasks };
+    
+    // 선택된 범위의 모든 날짜 키에 해당 일정을 복사하여 넣음
     range.forEach(date => {
       if (!updatedTasks[date]) updatedTasks[date] = [];
       updatedTasks[date] = [...updatedTasks[date], newTask];
     });
+    
     setTasks(updatedTasks);
     setTaskText('');
     setIsSelecting(false);
     setModalVisible(false);
   }, [taskText, addStartDate, addEndDate, tasks, getDatesInRange]);
 
+  // 할 일 완료(삭제) 처리
+  const deleteTask = useCallback((taskId) => {
+    setTasks(prev => {
+      const updated = { ...prev };
+      // 모든 날짜를 순회하며 해당 ID를 가진 일정을 지우고, 빈 날짜는 정리
+      Object.keys(updated).forEach(date => {
+        updated[date] = updated[date].filter(t => t.id !== taskId);
+        if (updated[date].length === 0) delete updated[date];
+      });
+      return updated;
+    });
+  }, []);
+
+  // 일정 추가 모달 열기 및 초기화
   const openAddModal = useCallback(() => {
-    setAddStartDate(viewDate); setAddEndDate(viewDate); setIsSelecting(false); setTaskText(''); setModalVisible(true);
+    setAddStartDate(viewDate); 
+    setAddEndDate(viewDate); 
+    setIsSelecting(false); 
+    setTaskText(''); 
+    setModalVisible(true);
   }, [viewDate]);
 
+  // 추가 모달 내의 달력 범위 선택 로직 (스마트 탭)
   const handleDayPress = useCallback((day) => {
     const clickedDate = day.dateString;
     if (!isSelecting) {
-      setAddStartDate(clickedDate); setAddEndDate(clickedDate); setIsSelecting(true);
+      setAddStartDate(clickedDate); 
+      setAddEndDate(clickedDate); 
+      setIsSelecting(true);
     } else {
       if (new Date(clickedDate) < new Date(addStartDate)) {
-        setAddEndDate(addStartDate); setAddStartDate(clickedDate);
+        setAddEndDate(addStartDate); 
+        setAddStartDate(clickedDate);
       } else {
         setAddEndDate(clickedDate);
       }
@@ -175,6 +217,11 @@ export default function App() {
     }
   }, [isSelecting, addStartDate]);
 
+  // ----------------------------------------------------------------------------
+  // [달력 시각화 마커]
+  // ----------------------------------------------------------------------------
+  
+  // 메인 달력: 일정이 있는 날짜와 현재 선택된 날짜(viewDate) 표시
   const mainMarkedDates = useMemo(() => {
     const marks = {};
     Object.keys(tasks).forEach((date) => {
@@ -188,17 +235,23 @@ export default function App() {
         };
       }
     });
-    if (!marks[viewDate]) marks[viewDate] = { customStyles: { container: { backgroundColor: '#4A90E2', borderRadius: 8 }, text: { color: '#FFF' } } };
+    // 일정이 없더라도 현재 선택된 날짜는 강조 표시
+    if (!marks[viewDate]) {
+      marks[viewDate] = { customStyles: { container: { backgroundColor: '#4A90E2', borderRadius: 8 }, text: { color: '#FFF' } } };
+    }
     return marks;
   }, [tasks, viewDate, theme.text]);
 
+  // 추가 모달 달력: 선택된 시작일과 종료일 사이를 이어주는 연결선 표시
   const modalMarkedDates = useMemo(() => {
     const marks = {};
     const range = getDatesInRange(addStartDate, addEndDate);
     range.forEach((date, index) => {
       marks[date] = {
-        color: isDarkMode ? '#2C3E50' : '#E3F2FD', textColor: theme.text,
-        startingDay: index === 0, endingDay: index === range.length - 1,
+        color: isDarkMode ? '#2C3E50' : '#E3F2FD', 
+        textColor: theme.text,
+        startingDay: index === 0, 
+        endingDay: index === range.length - 1,
       };
     });
     if (marks[addStartDate]) marks[addStartDate].color = '#4A90E2';
@@ -206,9 +259,15 @@ export default function App() {
     return marks;
   }, [addStartDate, addEndDate, isDarkMode, theme.text, getDatesInRange]);
 
+
+  // ============================================================================
+  // [UI 렌더링 영역]
+  // ============================================================================
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.bg }]}>
       <Stack.Screen options={{ headerShown: false }} />
+      
+      {/* --- 상단 헤더 --- */}
       <View style={styles.header}>
         <Text style={[styles.headerTitle, { color: theme.text }]}>Checklendar</Text>
         <TouchableOpacity onPress={() => setMenuVisible(true)}>
@@ -216,20 +275,30 @@ export default function App() {
         </TouchableOpacity>
       </View>
 
+      {/* --- 메인 달력 영역 --- */}
       <View style={[styles.calendarContainer, { backgroundColor: theme.card }]}>
         <Calendar
           key={isDarkMode ? 'dark' : 'light'}
           markingType={'custom'}
           markedDates={mainMarkedDates}
           onDayPress={(day) => setViewDate(day.dateString)}
-          theme={{ calendarBackground: theme.card, dayTextColor: theme.text, monthTextColor: theme.text, arrowColor: '#4A90E2', todayTextColor: '#4A90E2', textDisabledColor: isDarkMode ? '#444' : '#ccc' }}
+          theme={{ 
+            calendarBackground: theme.card, 
+            dayTextColor: theme.text, 
+            monthTextColor: theme.text, 
+            arrowColor: '#4A90E2', 
+            todayTextColor: '#4A90E2', 
+            textDisabledColor: isDarkMode ? '#444' : '#ccc' 
+          }}
           dayComponent={({date, state, marking}) => {
             const count = tasks[date.dateString]?.length || 0;
             const isSunday = new Date(date.dateString).getDay() === 0;
             const isSelected = date.dateString === viewDate;
             return (
               <TouchableOpacity onPress={() => setViewDate(date.dateString)} style={[styles.dayBox, isSelected && { backgroundColor: '#4A90E2' }]}>
-                <Text style={[styles.dayText, isSunday && { color: '#FF5252' }, { color: isSelected ? '#FFF' : theme.text }, state === 'disabled' && { color: isDarkMode ? '#444' : '#ccc' }]}>{date.day}</Text>
+                <Text style={[styles.dayText, isSunday && { color: '#FF5252' }, { color: isSelected ? '#FFF' : theme.text }, state === 'disabled' && { color: isDarkMode ? '#444' : '#ccc' }]}>
+                  {date.day}
+                </Text>
                 {count > 0 && (
                   <View style={styles.badgeRow}>
                     {count === 1 && <View style={[styles.dot, { backgroundColor: '#0064FF' }]} />}
@@ -243,22 +312,25 @@ export default function App() {
         />
       </View>
 
+      {/* --- 하단 할 일 목록 영역 --- */}
       <View style={styles.listContainer}>
         <Text style={[styles.listTitle, { color: theme.text }]}>{viewDate}의 할 일</Text>
         <FlatList
           data={tasks[viewDate] || []}
           keyExtractor={(item) => item.id}
           renderItem={({item}) => (
-            // 💡 애니메이션이 적용된 커스텀 아이템 사용
             <AnimatedTaskItem item={item} theme={theme} onComplete={deleteTask} />
           )}
           ListEmptyComponent={<Text style={[styles.emptyText, { color: theme.subText }]}>예정된 일정이 없습니다.</Text>}
         />
       </View>
 
-      <TouchableOpacity style={styles.fab} onPress={openAddModal}><Ionicons name="add" size={32} color="#FFF" /></TouchableOpacity>
+      {/* --- 우측 하단 일정 추가 버튼 (FAB) --- */}
+      <TouchableOpacity style={styles.fab} onPress={openAddModal}>
+        <Ionicons name="add" size={32} color="#FFF" />
+      </TouchableOpacity>
 
-      {/* 모달 및 메뉴 코드는 이전과 동일하게 유지 */}
+      {/* --- [모달] 새 일정 추가 폼 --- */}
       <Modal visible={isModalVisible} animationType="slide" presentationStyle="pageSheet">
         <SafeAreaView style={[styles.modalContainer, { backgroundColor: theme.bg }]}>
           <View style={[styles.modalHeader, { backgroundColor: theme.card, borderBottomWidth: 1, borderColor: theme.border }]}>
@@ -281,6 +353,7 @@ export default function App() {
         </SafeAreaView>
       </Modal>
 
+      {/* --- [모달] 바텀 시트 (설정 및 제어 메뉴) --- */}
       <Modal visible={isMenuVisible} transparent={true} animationType="none">
         <Animated.View style={[styles.menuOverlay, { opacity: overlayOpacity }]}>
           <TouchableOpacity style={styles.overlayTouchArea} activeOpacity={1} onPress={handleCloseMenu} />
@@ -292,15 +365,25 @@ export default function App() {
               <Text style={[styles.menuTitle, { color: theme.text }]}>메뉴</Text>
               <TouchableOpacity onPress={handleCloseMenu} style={styles.closeBtn}><Ionicons name="close" size={28} color={theme.icon} /></TouchableOpacity>
             </View>
-            <TouchableOpacity style={styles.menuItem} onPress={() => { handleCloseMenu(); router.push('/settings'); }}><Ionicons name="settings-outline" size={22} color={theme.subText} /><Text style={[styles.menuItemText, { color: theme.text }]}>설정</Text></TouchableOpacity>
-            <TouchableOpacity style={styles.menuItem} onPress={() => { setTasks({}); handleCloseMenu(); }}><Ionicons name="trash-outline" size={22} color="#FF5252" /><Text style={[styles.menuItemText, { color: '#FF5252' }]}>모든 일정 지우기</Text></TouchableOpacity>
+            <TouchableOpacity style={styles.menuItem} onPress={() => { handleCloseMenu(); router.push('/settings'); }}>
+              <Ionicons name="settings-outline" size={22} color={theme.subText} />
+              <Text style={[styles.menuItemText, { color: theme.text }]}>설정</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.menuItem} onPress={() => { setTasks({}); handleCloseMenu(); }}>
+              <Ionicons name="trash-outline" size={22} color="#FF5252" />
+              <Text style={[styles.menuItemText, { color: '#FF5252' }]}>모든 일정 지우기</Text>
+            </TouchableOpacity>
           </SafeAreaView>
         </Animated.View>
       </Modal>
+
     </SafeAreaView>
   );
 }
 
+// ============================================================================
+// [스타일 정의]
+// ============================================================================
 const styles = StyleSheet.create({
   container: { flex: 1 },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 15 },
@@ -313,7 +396,6 @@ const styles = StyleSheet.create({
   countText: { fontSize: 10, fontWeight: 'bold', marginLeft: 2 },
   listContainer: { flex: 1, padding: 20 },
   listTitle: { fontSize: 18, fontWeight: '600', marginBottom: 15 },
-  // 💡 할 일 레이아웃 스타일
   todoItem: { padding: 16, borderRadius: 15, marginBottom: 12, elevation: 1, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 3 },
   todoContent: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   todoText: { fontSize: 16, fontWeight: '600' },
