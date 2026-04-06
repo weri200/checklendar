@@ -1,11 +1,30 @@
-import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
-import { StyleSheet, Text, View, TouchableOpacity, TextInput, FlatList, Modal, Dimensions, Animated } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Stack, router } from 'expo-router';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Animated, Dimensions, FlatList, Modal, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { Calendar } from 'react-native-calendars';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
-import { Stack, router } from 'expo-router';
 import { useTheme } from './_layout';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+
+interface Task {
+  id: string;
+  text: string;
+  range: [string, string];
+}
+
+interface TaskState {
+  [key: string]: Task[]; // 문자열(날짜)을 키로, Task 배열을 값으로 가짐
+}
+
+interface ThemeType {
+  bg: string;
+  card: string;
+  text: string;
+  subText: string;
+  border: string;
+  icon: string;
+}
 
 // ============================================================================
 // [상수 정의]
@@ -18,8 +37,7 @@ const PANEL_HEIGHT = 300; // 하단 설정 메뉴(바텀 시트)의 높이
 // [개별 할 일 아이템 컴포넌트]
 // 할 일을 완료했을 때 체크 표시가 뜨고 서서히 사라지는 애니메이션을 담당합니다.
 // ============================================================================
-const AnimatedTaskItem = ({ item, theme, onComplete }) => {
-  const [isDone, setIsDone] = useState(false);
+const AnimatedTaskItem = ({ item, theme, onComplete }: { item: Task; theme: ThemeType; onComplete: (id: string) => void }) => {  const [isDone, setIsDone] = useState(false);
   const fadeAnim = useRef(new Animated.Value(1)).current; 
 
   const handlePress = () => {
@@ -64,7 +82,7 @@ export default function App() {
   // 1. 전역 테마 및 핵심 상태 관리
   const { isDarkMode } = useTheme(); 
   const [viewDate, setViewDate] = useState(new Date().toISOString().split('T')[0]); // 달력에서 선택된 날짜
-  const [tasks, setTasks] = useState({}); // 전체 할 일 데이터 (구조: { 'YYYY-MM-DD': [task1, task2...] })
+  const [tasks, setTasks] = useState<TaskState>({}); // 전체 할 일 데이터 (구조: { 'YYYY-MM-DD': [task1, task2...] })
   
   // 2. 모달 및 폼 상태 관리
   const [isModalVisible, setModalVisible] = useState(false); // 일정 추가 모달 표시 여부
@@ -146,7 +164,7 @@ export default function App() {
   // ----------------------------------------------------------------------------
   
   // 날짜 범위(시작일~종료일) 배열 생성기
-  const getDatesInRange = useCallback((start, end) => {
+  const getDatesInRange = useCallback((start: string, end: string) => {
     const dates = [];
     let curr = new Date(start);
     const last = new Date(end);
@@ -162,7 +180,7 @@ export default function App() {
     if (taskText.trim().length === 0) return;
     
     const range = getDatesInRange(addStartDate, addEndDate);
-    const newTask = { id: Date.now().toString(), text: taskText, range: [addStartDate, addEndDate] };
+    const newTask = { id: Date.now().toString(), text: taskText, range: [addStartDate, addEndDate] as [string, string] };
     const updatedTasks = { ...tasks };
     
     // 선택된 범위의 모든 날짜 키에 해당 일정을 복사하여 넣음
@@ -178,12 +196,12 @@ export default function App() {
   }, [taskText, addStartDate, addEndDate, tasks, getDatesInRange]);
 
   // 할 일 완료(삭제) 처리
-  const deleteTask = useCallback((taskId) => {
-    setTasks(prev => {
+const deleteTask = useCallback((taskId: string) => {
+      setTasks(prev => {
       const updated = { ...prev };
       // 모든 날짜를 순회하며 해당 ID를 가진 일정을 지우고, 빈 날짜는 정리
       Object.keys(updated).forEach(date => {
-        updated[date] = updated[date].filter(t => t.id !== taskId);
+        updated[date] = updated[date].filter((t: Task) => t.id !== taskId);
         if (updated[date].length === 0) delete updated[date];
       });
       return updated;
@@ -200,7 +218,7 @@ export default function App() {
   }, [viewDate]);
 
   // 추가 모달 내의 달력 범위 선택 로직 (스마트 탭)
-  const handleDayPress = useCallback((day) => {
+  const handleDayPress = useCallback((day: any) => {
     const clickedDate = day.dateString;
     if (!isSelecting) {
       setAddStartDate(clickedDate); 
@@ -223,7 +241,7 @@ export default function App() {
   
   // 메인 달력: 일정이 있는 날짜와 현재 선택된 날짜(viewDate) 표시
   const mainMarkedDates = useMemo(() => {
-    const marks = {};
+    const marks: { [key: string]: any } = {};
     Object.keys(tasks).forEach((date) => {
       if (tasks[date].length > 0) {
         marks[date] = {
@@ -244,7 +262,7 @@ export default function App() {
 
   // 추가 모달 달력: 선택된 시작일과 종료일 사이를 이어주는 연결선 표시
   const modalMarkedDates = useMemo(() => {
-    const marks = {};
+    const marks: { [key: string]: any } = {};
     const range = getDatesInRange(addStartDate, addEndDate);
     range.forEach((date, index) => {
       marks[date] = {
@@ -291,6 +309,7 @@ export default function App() {
             textDisabledColor: isDarkMode ? '#444' : '#ccc' 
           }}
           dayComponent={({date, state, marking}) => {
+            if (!date) return <View />;
             const count = tasks[date.dateString]?.length || 0;
             const isSunday = new Date(date.dateString).getDay() === 0;
             const isSelected = date.dateString === viewDate;
