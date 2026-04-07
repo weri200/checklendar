@@ -1,5 +1,6 @@
-import React, { createContext, useState, useContext, useMemo, useCallback } from 'react';
 import { Stack } from 'expo-router';
+import React, { createContext, useCallback, useContext, useMemo, useState } from 'react';
+import { useNotificationSetup } from '../useNotification';
 
 // ============================================================================
 // [1. 전역 테마 컨텍스트 및 훅 정의]
@@ -23,6 +24,9 @@ export const useTheme = () => useContext(ThemeContext);
 // ============================================================================
 export default function RootLayout() {
   
+  //  앱이 켜질 때 딱 한 번 알림 권한을 묻고 세팅
+  useNotificationSetup();
+  
   // 앱 전체의 다크모드 여부를 결정하는 최상위 상태
   const [isDarkMode, setIsDarkMode] = useState(false);
 
@@ -31,14 +35,11 @@ export default function RootLayout() {
   // ----------------------------------------------------------------------------
   
   // [최적화 1] useCallback: 테마 전환 함수 메모리 고정
-  // 컴포넌트가 다시 렌더링될 때마다 함수가 새로 생성되는 것을 막아줍니다.
   const toggleDarkMode = useCallback(() => {
     setIsDarkMode(prev => !prev);
   }, []);
 
   // [최적화 2] useMemo: 하위 컴포넌트로 전달할 객체 메모리 고정
-  // value 객체를 매번 새로 만들면, 테마를 구독하는 모든 하위 화면이 불필요하게 다시 그려집니다.
-  // 이를 방지하기 위해 isDarkMode나 toggleDarkMode가 바뀔 때만 객체를 새로 생성합니다.
   const themeValue = useMemo(() => ({
     isDarkMode,
     toggleDarkMode
