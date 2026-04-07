@@ -1,6 +1,11 @@
+import Ionicons from '@expo/vector-icons/Ionicons';
+import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
-import React, { createContext, useCallback, useContext, useMemo, useState } from 'react';
+import * as SplashScreen from 'expo-splash-screen';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { useNotificationSetup } from '../useNotification';
+
+SplashScreen.preventAutoHideAsync();
 
 // ============================================================================
 // [1. 전역 테마 컨텍스트 및 훅 정의]
@@ -23,9 +28,19 @@ export const useTheme = () => useContext(ThemeContext);
 // 앱이 실행될 때 가장 먼저 렌더링되는 뼈대로, 하위 모든 화면에 테마 정보를 공급합니다.
 // ============================================================================
 export default function RootLayout() {
-  
+
   //  앱이 켜질 때 딱 한 번 알림 권한을 묻고 세팅
   useNotificationSetup();
+
+  const [fontsLoaded] = useFonts({
+    ...Ionicons.font,
+  });
+
+  useEffect(() => {
+    if (fontsLoaded) {
+      SplashScreen.hideAsync();
+    }
+  }, [fontsLoaded]);
   
   // 앱 전체의 다크모드 여부를 결정하는 최상위 상태
   const [isDarkMode, setIsDarkMode] = useState(false);
@@ -44,6 +59,10 @@ export default function RootLayout() {
     isDarkMode,
     toggleDarkMode
   }), [isDarkMode, toggleDarkMode]);
+
+  if (!fontsLoaded) {
+    return null;
+  }
 
   // ============================================================================
   // [3. 화면 렌더링 및 데이터 공급(Provider) 영역]
