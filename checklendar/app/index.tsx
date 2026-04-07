@@ -351,7 +351,6 @@ const deleteTask = useCallback((taskId: string) => {
       </TouchableOpacity>
 
       {/* --- [모달] 새 일정 추가 폼 --- */}
-      {/* --- [모달] 새 일정 추가 폼 --- */}
       <Modal visible={isModalVisible} animationType="slide" presentationStyle="pageSheet">
         <SafeAreaView style={[styles.modalContainer, { backgroundColor: theme.bg }]}>
           <KeyboardAvoidingView 
