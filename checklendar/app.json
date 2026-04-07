@@ -2,7 +2,7 @@
   "expo": {
     "name": "checklendar",
     "slug": "checklendar",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "photosocialapp",
@@ -12,8 +12,8 @@
     },
     "android": {
       "package": "com.weri_200.checklendar",
-      "softwareKeyboardLayoutMode": "resize"      ,
-      "versionCode": 1,
+      "softwareKeyboardLayoutMode": "resize",
+      "versionCode": 2,
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -44,6 +44,12 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "ac7e0e45-9010-4e71-8a7b-a8d21c156a00"
+      }
     }
   }
 }
