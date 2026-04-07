@@ -1,8 +1,8 @@
-import React, { useRef, useEffect, useMemo } from 'react';
-import { StyleSheet, View, TouchableOpacity, Switch, Platform, Animated } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router, Stack } from 'expo-router';
+import React, { useEffect, useMemo, useRef } from 'react';
+import { Animated, Platform, StyleSheet, Switch, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from './_layout';
 
 // ============================================================================
@@ -71,11 +71,8 @@ export default function SettingsScreen() {
         headerTitleAlign: 'center', 
         headerShadowVisible: false, // 헤더 하단 구분선 제거
         headerBackVisible: false,   // iOS 기본 뒤로가기 버튼(알약 모양) 숨김 처리
-        headerStyle: { 
-          backgroundColor: isDarkMode ? '#121212' : '#F8F9FA', // 헤더 배경색 동기화
-        },
+        headerStyle: { backgroundColor: isDarkMode ? '#121212' : '#F8F9FA', },
         headerTintColor: isDarkMode ? '#FFF' : '#333', 
-        headerLeftContainerStyle: { paddingLeft: 10 },
         // 커스텀 뒤로가기 버튼
         headerLeft: () => (
           <TouchableOpacity 

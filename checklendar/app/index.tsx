@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Stack, router } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Dimensions, FlatList, Modal, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Animated, Dimensions, FlatList, KeyboardAvoidingView, Modal, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { Calendar } from 'react-native-calendars';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from './_layout';
@@ -253,6 +253,7 @@ const deleteTask = useCallback((taskId: string) => {
         };
       }
     });
+    
     // 일정이 없더라도 현재 선택된 날짜는 강조 표시
     if (!marks[viewDate]) {
       marks[viewDate] = { customStyles: { container: { backgroundColor: '#4A90E2', borderRadius: 8 }, text: { color: '#FFF' } } };
@@ -350,25 +351,46 @@ const deleteTask = useCallback((taskId: string) => {
       </TouchableOpacity>
 
       {/* --- [모달] 새 일정 추가 폼 --- */}
+      {/* --- [모달] 새 일정 추가 폼 --- */}
       <Modal visible={isModalVisible} animationType="slide" presentationStyle="pageSheet">
         <SafeAreaView style={[styles.modalContainer, { backgroundColor: theme.bg }]}>
-          <View style={[styles.modalHeader, { backgroundColor: theme.card, borderBottomWidth: 1, borderColor: theme.border }]}>
-            <TouchableOpacity onPress={() => setModalVisible(false)}><Text style={styles.cancelText}>취소</Text></TouchableOpacity>
-            <Text style={[styles.modalTitle, { color: theme.text }]}>새 일정 추가</Text>
-            <TouchableOpacity onPress={saveTask}><Text style={styles.saveText}>저장</Text></TouchableOpacity>
-          </View>
-          <View style={[styles.selectionInfo, { backgroundColor: theme.card }]}>
-            <View style={styles.infoBox}><Text style={styles.infoLabel}>시작일</Text><Text style={[styles.infoValue, { color: theme.text }]}>{addStartDate}</Text></View>
-            <View style={styles.arrowBox}><Ionicons name="arrow-forward" size={24} color="#4A90E2" /></View>
-            <View style={styles.infoBox}><Text style={styles.infoLabel}>종료일</Text><Text style={[styles.infoValue, { color: theme.text }]}>{addEndDate}</Text></View>
-          </View>
-          <View style={[styles.modalCalendarWrapper, { backgroundColor: theme.card }]}>
-            <Calendar markingType={'period'} markedDates={modalMarkedDates} theme={{ calendarBackground: theme.card, dayTextColor: theme.text, monthTextColor: theme.text, todayTextColor: '#4A90E2' }} onDayPress={handleDayPress} />
-          </View>
-          <View style={styles.inputSection}>
-            <Text style={[styles.inputLabel, { color: theme.subText }]}>할 일 내용</Text>
-            <TextInput style={[styles.textInput, { backgroundColor: theme.card, color: theme.text, borderColor: theme.border }]} placeholder="어떤 일정이 있나요?" placeholderTextColor={theme.subText} value={taskText} onChangeText={setTaskText} />
-          </View>
+          <KeyboardAvoidingView 
+            style={{ flex: 1 }} 
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined }
+            keyboardVerticalOffset={Platform.OS === 'ios' ? 70 : 0}
+          >
+            <ScrollView 
+              contentContainerStyle={{ flexGrow: 1 }} 
+              keyboardShouldPersistTaps="handled"
+            >
+              <View style={[styles.modalHeader, { backgroundColor: theme.card, borderBottomWidth: 1, borderColor: theme.border }]}>
+                <TouchableOpacity onPress={() => setModalVisible(false)}><Text style={styles.cancelText}>취소</Text></TouchableOpacity>
+                <Text style={[styles.modalTitle, { color: theme.text }]}>새 일정 추가</Text>
+                <TouchableOpacity onPress={saveTask}><Text style={styles.saveText}>저장</Text></TouchableOpacity>
+              </View>
+              
+              <View style={[styles.selectionInfo, { backgroundColor: theme.card }]}>
+                <View style={styles.infoBox}><Text style={styles.infoLabel}>시작일</Text><Text style={[styles.infoValue, { color: theme.text }]}>{addStartDate}</Text></View>
+                <View style={styles.arrowBox}><Ionicons name="arrow-forward" size={24} color="#4A90E2" /></View>
+                <View style={styles.infoBox}><Text style={styles.infoLabel}>종료일</Text><Text style={[styles.infoValue, { color: theme.text }]}>{addEndDate}</Text></View>
+              </View>
+              
+              <View style={[styles.modalCalendarWrapper, { backgroundColor: theme.card }]}>
+                <Calendar markingType={'period'} markedDates={modalMarkedDates} theme={{ calendarBackground: theme.card, dayTextColor: theme.text, monthTextColor: theme.text, todayTextColor: '#4A90E2' }} onDayPress={handleDayPress} />
+              </View>
+              
+              <View style={styles.inputSection}>
+                <Text style={[styles.inputLabel, { color: theme.subText }]}>할 일 내용</Text>
+                <TextInput 
+                  style={[styles.textInput, { backgroundColor: theme.card, color: theme.text, borderColor: theme.border }]} 
+                  placeholder="어떤 일정이 있나요?" 
+                  placeholderTextColor={theme.subText} 
+                  value={taskText} 
+                  onChangeText={setTaskText} 
+                />
+              </View>
+            </ScrollView>
+          </KeyboardAvoidingView>
         </SafeAreaView>
       </Modal>
 
