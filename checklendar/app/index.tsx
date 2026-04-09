@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Stack, router } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, FlatList, KeyboardAvoidingView, Modal, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { Calendar } from 'react-native-calendars';
@@ -290,6 +291,7 @@ export default function App() {
   // ----------------------------------------------------------------------------
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.bg }]}>
+      <StatusBar style={isDarkMode ? 'light' : 'dark'} />
       <Stack.Screen options={{ headerShown: false }} />
       
       {/* 상단 앱 제목과 햄버거 메뉴 버튼 */}

@@ -10,6 +10,8 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { updateNotification } from '../useNotification';
 import { useTheme } from './_layout';
 
+import { StatusBar } from 'expo-status-bar';
+
 export default function SettingsScreen() {
 
   // ----------------------------------------------------------------------------
@@ -147,7 +149,7 @@ export default function SettingsScreen() {
   // ----------------------------------------------------------------------------
   return (
     <Animated.View style={[styles.container, { backgroundColor: animatedColors.bgColor }]}>
-      
+            <StatusBar style={isDarkMode ? 'light' : 'dark'} />
       {/* 화면 상단의 제목('설정')과 뒤로 가기 버튼을 만듭니다. */}
       <Stack.Screen options={{ 
         headerShown: true, 

@@ -105,10 +105,13 @@ export const updateNotification = async () => {
       await Notifications.scheduleNotificationAsync({
         content: {
           title: "📅 오늘 일정을 확인하세요!",
-          body: `Checklendar에 오늘 ${taskCount}개의 할 일이 등록되어 있습니다.`, // '오늘 3개의 할 일이...' 처럼 똑똑하게 보여줍니다.
+          body: `Checklendar에 오늘 ${taskCount}개의 할 일이 등록되어 있습니다.`,
           sound: true,
         },
-        trigger: targetDate as any, // 우리가 계산한 targetDate에 정확히 터집니다.
+        trigger: {
+          type: Notifications.SchedulableTriggerInputTypes.DATE,
+          date: new Date(targetDate),
+        },
       });
     }
   } catch (error) {
