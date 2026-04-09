@@ -4,7 +4,7 @@
 VERSION=$(node -p "require('./app.json').expo.version")
 
 # 2. 저장할 경로와 파일 이름 설정 (윈도우 바탕화면 기준)
-OUTPUT_PATH="/mnt/c/Ckecklendar/checklendar/checklendar/Builds/Checklendar_v${VERSION}.aab"
+OUTPUT_PATH="/mnt/c/Ckecklendar/Builds/Checklendar_v${VERSION}.aab"
 
 echo "🚀 Checklendar v${VERSION} 빌드를 시작합니다..."
 echo "📍 저장 위치: ${OUTPUT_PATH}"
