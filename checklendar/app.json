@@ -13,7 +13,6 @@
     "android": {
       "package": "com.weri_200.checklendar",
       "softwareKeyboardLayoutMode": "resize",
-      "versionCode": 4,
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
