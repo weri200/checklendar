@@ -11,7 +11,7 @@
       "supportsTablet": true
     },
     "android": {
-      "versionCode": 6,
+      "versionCode": 7,
       "package": "com.weri_200.checklendar",
       "softwareKeyboardLayoutMode": "resize",
       "adaptiveIcon": {
