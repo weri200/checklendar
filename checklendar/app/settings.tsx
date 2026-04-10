@@ -89,8 +89,8 @@ export default function SettingsScreen() {
       setTempNotiTime(new Date(notiTime));
       setShowPicker(true);
       Animated.parallel([
-        Animated.timing(modalOpacity, { toValue: 1, duration: 250, useNativeDriver: true }),
-        Animated.timing(modalTranslateY, { toValue: 0, duration: 250, useNativeDriver: true })
+        Animated.timing(modalOpacity, { toValue: 1, duration: 250, useNativeDriver: false }),
+        Animated.timing(modalTranslateY, { toValue: 0, duration: 250, useNativeDriver: false })
       ]).start();
     } else {
       // 안드로이드는 시스템 기본 팝업을 바로 띄웁니다.
@@ -102,8 +102,8 @@ export default function SettingsScreen() {
   const closePicker = () => {
     if (Platform.OS === 'ios') {
       Animated.parallel([
-        Animated.timing(modalOpacity, { toValue: 0, duration: 200, useNativeDriver: true }),
-        Animated.timing(modalTranslateY, { toValue: 400, duration: 200, useNativeDriver: true })
+        Animated.timing(modalOpacity, { toValue: 0, duration: 200, useNativeDriver: false }),
+        Animated.timing(modalTranslateY, { toValue: 400, duration: 200, useNativeDriver: false })
       ]).start(() => {
         setShowPicker(false); 
       });

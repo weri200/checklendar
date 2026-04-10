@@ -56,56 +56,50 @@ export const useNotificationSetup = () => {
 // ----------------------------------------------------------------------------
 export const updateNotification = async () => {
   try {
-    // 1. 과거에 예약해둔 알림들이 꼬이지 않게 싹 다 지우고 백지상태로 만듭니다.
+    // 1. 기존 알림 싹 지우기
     await Notifications.cancelAllScheduledNotificationsAsync();
 
-    // 2. 기기 서랍(AsyncStorage)에서 알림 설정과 '할 일 목록'을 꺼내옵니다.
     const savedEnabled = await AsyncStorage.getItem('notiEnabled');
     const savedTimeStr = await AsyncStorage.getItem('notiTime');
     const tasksStr = await AsyncStorage.getItem('@checklendar_tasks'); 
 
     const isEnabled = savedEnabled ? JSON.parse(savedEnabled) : false;
-    
-    // 알림 스위치를 꺼뒀거나, 시간을 설정한 적이 없다면 예약하지 않고 그냥 돌아갑니다.
     if (!isEnabled || !savedTimeStr) return; 
 
-    // 꺼내온 글자 데이터를 써먹을 수 있는 시간(Date)과 객체(Object) 형태로 바꿉니다.
     const notiTime = new Date(savedTimeStr);
     const tasks = tasksStr ? JSON.parse(tasksStr) : {};
 
-    // 3. 오늘 날짜를 구합니다. (예: '2026-04-08')
     const now = new Date();
     const todayStr = new Date(now.getTime() - (now.getTimezoneOffset() * 60000)).toISOString().split('T')[0];
 
-    // 4. 수많은 날짜 중 "오늘 이후이면서 + 할 일이 1개 이상 있는 날"만 쏙쏙 골라냅니다.
+    // [수정 포인트 1] 미완료된 할 일이 1개라도 있는 날짜만 골라냅니다.
     const activeDates = Object.keys(tasks)
-      .filter(date => date >= todayStr && tasks[date].length > 0)
+      .filter(date => {
+        // 해당 날짜의 할 일 중 완료되지 않은(isDone: false) 것만 필터링
+        const incompleteTasks = tasks[date].filter((t: any) => !t.isDone);
+        return date >= todayStr && incompleteTasks.length > 0;
+      })
       .sort();
 
-    // 5. 스마트폰 운영체제(iOS/Android)는 한 번에 너무 많은 알림 예약을 허락하지 않습니다.
-    // 안전하게 가까운 미래의 딱 30일 치 알림만 예약합니다.
     const datesToSchedule = activeDates.slice(0, 30);
 
-    // 6. 골라낸 날짜들(datesToSchedule)을 하나씩 돌면서 알람 시계를 맞춥니다.
     for (const dateStr of datesToSchedule) {
-      
-      // '2026-04-08' 이라는 글자를 2026, 4, 8 숫자로 쪼갭니다.
       const [year, month, day] = dateStr.split('-').map(Number);
-      
-      // 알람이 울릴 정확한 타이밍 = (할 일이 있는 날짜) + (사용자가 설정한 시/분)
       const targetDate = new Date(year, month - 1, day, notiTime.getHours(), notiTime.getMinutes(), 0);
 
-      // 이미 시간이 지나버린 과거라면 알람을 맞출 수 없으니 다음 날짜로 넘어갑니다.
       if (targetDate <= now) continue;
 
-      // 그날 할 일이 몇 개나 있는지 세어봅니다.
-      const taskCount = tasks[dateStr].length;
+      // [수정 포인트 2] 알림 문구에 들어갈 개수도 '미완료 일정'만 셉니다.
+      const incompleteTasks = tasks[dateStr].filter((t: any) => !t.isDone);
+      const taskCount = incompleteTasks.length;
 
-      // 7. 스마트폰에게 "이 날짜 이 시간에 팝업 띄워줘!" 라고 예약을 겁니다.
+      // 만약 오늘 모든 할 일을 완료했다면 알림을 예약하지 않습니다.
+      if (taskCount === 0) continue;
+
       await Notifications.scheduleNotificationAsync({
         content: {
-          title: "📅 오늘 일정을 확인하세요!",
-          body: `Checklendar에 오늘 ${taskCount}개의 할 일이 등록되어 있습니다.`,
+          title: "📅 남은 일정을 확인하세요!",
+          body: `오늘 아직 완료하지 않은 할 일이 ${taskCount}개 있습니다.`,
           sound: true,
         },
         trigger: {
