@@ -11,9 +11,10 @@ import { useTheme } from './_layout';
 
 // 앱에서 다룰 데이터들의 형태(규격)를 미리 약속해 둡니다.
 interface Task {
-  id: string;              // 할 일의 고유 번호 (보통 생성 시간을 사용)
-  text: string;            // 사용자가 입력한 할 일 내용
+  id: string;            // 할 일의 고유 번호 (보통 생성 시간을 사용)
+  text: string;          // 사용자가 입력한 할 일 내용
   range: [string, string]; // [시작일, 종료일] 형태의 기간 정보
+  isDone: boolean;       // 완료 여부 (새로 추가됨)
 }
 
 interface TaskState {
@@ -34,43 +35,39 @@ const PANEL_HEIGHT = 300;
 
 // ----------------------------------------------------------------------------
 // [개별 할 일 아이템 컴포넌트]
-// 사용자가 할 일의 동그라미를 누르면 체크 표시가 생기고 부드럽게 사라집니다.
+// 사용자가 할 일의 동그라미를 누르면 체크 표시가 생기고 부드럽게 반투명해집니다.
 // ----------------------------------------------------------------------------
-const AnimatedTaskItem = ({ item, theme, onComplete }: { item: Task; theme: ThemeType; onComplete: (id: string) => void }) => { 
-  const [isDone, setIsDone] = useState(false);
-  
-  // 투명도 조절을 위한 애니메이션 값 (1: 완전 선명함, 0: 완전 투명함)
-  const fadeAnim = useRef(new Animated.Value(1)).current; 
+const AnimatedTaskItem = ({ item, theme, onToggle }: { item: Task; theme: ThemeType; onToggle: (id: string) => void }) => {
+  const fadeAnim = useRef(new Animated.Value(item.isDone ? 0.4 : 1)).current;
 
-  // 체크 버튼을 눌렀을 때 실행되는 함수
-  const handlePress = () => {
-    setIsDone(true); // 1. 먼저 체크 모양으로 바꿉니다.
-    
-    // 2. 0.4초에 걸쳐 서서히 투명해지는 애니메이션을 실행합니다.
+  useEffect(() => {
     Animated.timing(fadeAnim, {
-      toValue: 0,
-      duration: 400,
+      toValue: item.isDone ? 0.4 : 1,
+      duration: 300,
       useNativeDriver: true,
-    }).start(() => {
-      // 3. 투명해지는 게 완전히 끝나면 부모(App)에게 이 할 일을 삭제해 달라고 요청합니다.
-      onComplete(item.id); 
-    });
+    }).start();
+  }, [item.isDone, fadeAnim]);
+
+  const handlePress = () => {
+    onToggle(item.id);
   };
 
   return (
     <Animated.View style={[styles.todoItem, { backgroundColor: theme.card, opacity: fadeAnim }]}>
       <TouchableOpacity activeOpacity={0.7} onPress={handlePress} style={styles.todoContent}>
         <View style={{ flex: 1 }}>
-          <Text style={[styles.todoText, { color: theme.text, textDecorationLine: isDone ? 'line-through' : 'none' }]}>
+          <Text style={[styles.todoText, { color: theme.text, textDecorationLine: item.isDone ? 'line-through' : 'none' }]}>
             {item.text}
           </Text>
-          <Text style={[styles.todoRange, { color: theme.subText }]}>{item.range[0]} ~ {item.range[1]}</Text>
-        </View>
-        <Ionicons 
-          name={isDone ? "checkmark-circle" : "ellipse-outline"} 
-          size={26} 
-          color={isDone ? "#34C759" : theme.subText} 
-          style={{ marginLeft: 12 }} 
+          <Text style={[styles.todoRange, { color: theme.subText }]}>
+            {item.range[0]} ~ {item.range[1]}
+          </Text>
+          </View>
+        <Ionicons
+          name={item.isDone ? "checkmark-circle" : "ellipse-outline"}
+          size={26}
+          color={item.isDone ? "#34C759" : theme.subText}
+          style={{ marginLeft: 12 }}
         />
       </TouchableOpacity>
     </Animated.View>
@@ -80,7 +77,7 @@ const AnimatedTaskItem = ({ item, theme, onComplete }: { item: Task; theme: Them
 
 // ----------------------------------------------------------------------------
 // [메인 화면 컴포넌트]
-// 달력을 보여주고, 할 일을 추가/삭제하며, 기기에 데이터를 저장하는 메인 두뇌입니다.
+// 달력을 보여주고, 할 일을 추가/완료 처리하며, 기기에 데이터를 저장하는 메인 두뇌입니다.
 // ----------------------------------------------------------------------------
 export default function App() {
   
@@ -130,7 +127,7 @@ export default function App() {
     loadTasks();
   }, []);
 
-  // [핵심] 할 일이 추가되거나 지워질 때마다 화면, 기기 저장소, 알림 예약을 한 번에 똑같이 맞춰주는 만능 함수입니다.
+  // [핵심] 할 일이 추가되거나 완료 상태가 바뀔 때마다 화면, 기기 저장소, 알림 예약을 한 번에 똑같이 맞춰주는 만능 함수입니다.
   const updateAndSaveTasks = async (newTasks: TaskState) => {
     setTasks(newTasks); 
     try {
@@ -185,7 +182,8 @@ export default function App() {
     if (taskText.trim().length === 0) return; // 빈 글자는 무시합니다.
     
     const range = getDatesInRange(addStartDate, addEndDate);
-    const newTask = { id: Date.now().toString(), text: taskText, range: [addStartDate, addEndDate] as [string, string] };
+    // [수정] 새로운 할 일을 추가할 때 isDone: false로 초기화합니다.
+    const newTask: Task = { id: Date.now().toString(), text: taskText, range: [addStartDate, addEndDate] as [string, string], isDone: false };
     const updatedTasks = { ...tasks };
     
     range.forEach(date => {
@@ -201,17 +199,24 @@ export default function App() {
     setModalVisible(false);
   }, [taskText, addStartDate, addEndDate, tasks, getDatesInRange]);
 
-  // 할 일을 삭제합니다. 하나의 일정이 여러 날짜에 걸쳐있을 수 있으므로 모든 날짜를 뒤져서 지웁니다.
-  const deleteTask = useCallback((taskId: string) => {
-    const updated = { ...tasks };
+  // [수정 및 핵심] 할 일 데이터를 삭제하는 대신 완료 상태를 뒤집습니다. (삭제 기능은 데이터 초기화용으로만 남겨둡니다.)
+  // 하나의 일정이 여러 날짜에 걸쳐있을 수 있으므로 모든 날짜를 뒤져서 상태를 바꿉니다.
+  const toggleTaskCompletion = useCallback((taskId: string) => {
+    const updatedTasks = { ...tasks };
     
-    Object.keys(updated).forEach(date => {
-      updated[date] = updated[date].filter((t: Task) => t.id !== taskId);
-      // 할 일이 0개가 된 날짜는 데이터 방 자체를 청소해 줍니다.
-      if (updated[date].length === 0) delete updated[date];
+    // 전체 데이터 날짜를 돌면서 해당 할 일을 찾습니다.
+    Object.keys(updatedTasks).forEach(date => {
+      // 해당 날짜의 할 일 목록에서 ID가 일치하는 할 일을 찾아 상태를 뒤집습니다.
+      updatedTasks[date] = updatedTasks[date].map((task: Task) => {
+        if (task.id === taskId) {
+          return { ...task, isDone: !task.isDone }; // 데이터를 지우지 않고 isDone 상태만 반전시킵니다.
+        }
+        return task;
+      });
     });
     
-    updateAndSaveTasks(updated); 
+    // 변경된 데이터를 화면과 저장소에 반영합니다.
+    updateAndSaveTasks(updatedTasks); 
   }, [tasks]);
 
   // 새 일정 추가 버튼(+)을 눌렀을 때, 현재 보고 있는 날짜로 초기화하며 창을 엽니다.
@@ -317,23 +322,51 @@ export default function App() {
             todayTextColor: '#4A90E2', 
             textDisabledColor: isDarkMode ? '#444' : '#ccc' 
           }}
-          dayComponent={({date, state, marking}) => {
+          dayComponent={({date, state}) => {
             if (!date) return <View />;
-            const count = tasks[date.dateString]?.length || 0;
+            
+            // 1. 해당 날짜의 모든 일정을 가져옵니다.
+            const dayTasks = tasks[date.dateString] || [];
+            
+            // 2. 완료되지 않은 일정과 완료된 일정의 개수를 각각 셉니다.
+            const incompleteCount = dayTasks.filter(t => !t.isDone).length;
+            const completedCount = dayTasks.filter(t => t.isDone).length;
+            
             const isSunday = new Date(date.dateString).getDay() === 0;
             const isSelected = date.dateString === viewDate;
             
-            // 달력의 하루하루 네모칸을 그립니다. 일정이 3개 이상이면 '+숫자' 형태로 보여줍니다.
             return (
               <TouchableOpacity onPress={() => setViewDate(date.dateString)} style={[styles.dayBox, isSelected && { backgroundColor: '#4A90E2' }]}>
                 <Text style={[styles.dayText, isSunday && { color: '#FF5252' }, { color: isSelected ? '#FFF' : theme.text }, state === 'disabled' && { color: isDarkMode ? '#444' : '#ccc' }]}>
                   {date.day}
                 </Text>
-                {count > 0 && (
-                  <View style={styles.badgeRow}>
-                    {count === 1 && <View style={[styles.dot, { backgroundColor: '#0064FF' }]} />}
-                    {count === 2 && <><View style={[styles.dot, { backgroundColor: '#0064FF' }]} /><View style={[styles.dot, { backgroundColor: '#34C759' }]} /></>}
-                    {count >= 3 && <><View style={[styles.dot, { backgroundColor: '#FF9500' }]} /><Text style={[styles.countText, { color: '#FF9500' }]}>{count}</Text></>}
+                
+                {/* 3. 점과 숫자를 위아래로 배치하는 컨테이너 */}
+                {(incompleteCount > 0 || completedCount > 0) && (
+                  <View style={styles.badgeContainer}>
+  
+                    {/* 왼쪽: 미완료 (1개면 파란 점, 2개 이상이면 파란 숫자) */}
+                    {incompleteCount > 0 && (
+                      incompleteCount === 1 ? (
+                        <View style={[styles.dot, { backgroundColor: '#0064FF', marginRight: completedCount > 0 ? 4 : 0 }]} />
+                      ) : (
+                        <Text style={[styles.countText, { color: '#0064FF', marginRight: completedCount > 0 ? 4 : 0 }]}>
+                          {incompleteCount}
+                        </Text>
+                      )
+                    )}
+
+                    {/* 오른쪽: 완료 (1개면 초록 점, 2개 이상이면 초록 숫자) */}
+                    {completedCount > 0 && (
+                      completedCount === 1 ? (
+                        <View style={[styles.dot, { backgroundColor: '#34C759' }]} />
+                      ) : (
+                        <Text style={[styles.countText, { color: '#34C759' }]}>
+                          {completedCount}
+                        </Text>
+                      )
+                    )}
+                    
                   </View>
                 )}
               </TouchableOpacity>
@@ -349,7 +382,7 @@ export default function App() {
           data={tasks[viewDate] || []}
           keyExtractor={(item) => item.id}
           renderItem={({item}) => (
-            <AnimatedTaskItem item={item} theme={theme} onComplete={deleteTask} />
+            <AnimatedTaskItem item={item} theme={theme} onToggle={toggleTaskCompletion} />
           )}
           ListEmptyComponent={<Text style={[styles.emptyText, { color: theme.subText }]}>예정된 일정이 없습니다.</Text>}
         />
@@ -450,12 +483,12 @@ const styles = StyleSheet.create({
   // --- [달력 영역] ---
   calendarContainer: { marginHorizontal: 15, borderRadius: 15, padding: 10, elevation: 2, overflow: 'hidden' }, // 달력을 감싸는 둥근 네모 상자
   dayBox: { alignItems: 'center', justifyContent: 'center', width: 40, height: 40, borderRadius: 20 }, // 달력 안의 하루하루를 나타내는 동그란 칸
-  dayText: { fontSize: 15 }, // 날짜 숫자 크기
+  dayText: { fontSize: 15 }, // 날짜 숫자 크기r
   
-  // 달력 숫자 밑에 찍히는 파란색/초록색/주황색 점(일정 개수 표시)
-  badgeRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 2, height: 10 },
-  dot: { width: 5, height: 5, borderRadius: 2.5, marginHorizontal: 1.5 },
-  countText: { fontSize: 10, fontWeight: 'bold', marginLeft: 2 },
+// --- [변경된 뱃지(점/숫자 혼합) 스타일] ---
+  badgeContainer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 2 },
+  countText: { fontSize: 11, fontWeight: 'bold' }, 
+  dot: { width: 5, height: 5, borderRadius: 2.5 }, // 1개일 때 보여줄 동그란 점
 
   // --- [하단 할 일 목록 영역] ---
   listContainer: { flex: 1, padding: 20 },
