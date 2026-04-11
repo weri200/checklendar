@@ -4,84 +4,114 @@ import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { useNotificationSetup } from '../useNotification';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// 폰트나 데이터가 다 준비될 때까지 시작 화면(스플래시)이 1초 만에 꺼지지 않도록 꽉 붙잡아둡니다.
+// ----------------------------------------------------------------------------
+// [준비 단계] 앱이 켜질 때 필요한 것들
+// ----------------------------------------------------------------------------
+
+// 폰트나 데이터가 준비되기 전에 하얀 빈 화면이 보이지 않도록
+// 스플래시(로딩) 화면을 강제로 띄워둡니다.
 SplashScreen.preventAutoHideAsync();
 
 // ----------------------------------------------------------------------------
-// [1. 앱 전체에서 꺼내 쓸 '전역 저장소(Context)' 만들기]
-// 메인 화면, 설정 화면 어디서든 '지금 다크모드야?'라고 물어보고 
-// 스위치를 조작할 수 있도록 공용 보관함을 만듭니다.
+// [1. 다크모드 공용 서랍 (Context) 만들기]
+// 앱 안의 어떤 화면에서든 다크모드 상태를 꺼내 쓰고 변경할 수 있는 '공용 서랍'입니다.
 // ----------------------------------------------------------------------------
 
-// 보관함의 기본 형태(설계도)를 만듭니다.
+// 1-1. 서랍의 기본 설계도 만들기
 const ThemeContext = createContext({
-  isDarkMode: false,
-  toggleDarkMode: () => {},
+  isDarkMode: false,           // 현재 다크모드인지 아닌지 (기본값: false)
+  toggleDarkMode: () => {},    // 다크모드를 껐다 켜는 스위치 (함수)
 });
 
-// 다른 파일(index.tsx, settings.tsx)에서 이 보관함을 쉽게 열어볼 수 있도록 
-// 'useTheme'이라는 마법의 열쇠(커스텀 훅)를 만들어 수출(export)합니다.
+// 1-2. 다른 파일에서 이 서랍을 쉽게 열 수 있게 해주는 '만능 열쇠(Hook)' 만들기
 export const useTheme = () => useContext(ThemeContext);
 
-
 // ----------------------------------------------------------------------------
-// [2. 앱의 가장 밑바탕 뼈대 (Root Layout)]
-// 앱 아이콘을 눌러 실행할 때 가장 먼저 실행되며, 모든 화면을 감싸는 부모입니다.
+// [2. 앱의 몸통 (Root Layout)]
+// 모든 화면을 감싸고 있는 최상위 부모 컴포넌트입니다.
 // ----------------------------------------------------------------------------
 export default function RootLayout() {
 
-  // 앱이 처음 켜질 때, 알림을 보낼 수 있도록 사용자에게 권한을 묻고 세팅합니다.
+  // 1. 사용자에게 알림 권한을 묻고 세팅합니다.
   useNotificationSetup();
 
-  // 앱에서 사용할 예쁜 아이콘 폰트(Ionicons)를 미리 다운로드하여 준비합니다.
+  // 2. 앱에서 쓸 예쁜 아이콘(Ionicons)을 미리 불러옵니다.
   const [fontsLoaded] = useFonts({
     ...Ionicons.font,
   });
 
-  // 폰트가 무사히 다 불러와졌다면, 아까 붙잡아두었던 시작 화면(스플래시)을 치워줍니다.
+  // 3. 폰트가 다 준비되었다면, 띄워두었던 스플래시 화면을 이제 치워줍니다.
   useEffect(() => {
     if (fontsLoaded) {
       SplashScreen.hideAsync();
     }
   }, [fontsLoaded]);
   
-  // 앱 전체가 다크모드인지 라이트모드인지 기억하는 최상위 스위치입니다.
-  const [isDarkMode, setIsDarkMode] = useState(false);
-
   // ----------------------------------------------------------------------------
-  // [3. 화면 버벅임 방지 (성능 최적화)]
-  // 앱 화면이 바뀔 때마다 스위치와 보관함이 새로 만들어지며 메모리를 낭비하지 않도록,
-  // '이 기능들은 한 번만 만들고 꽉 기억해둬!' 라고 지시하는 과정입니다.
+  // [3. 다크모드 상태 관리 & 저장]
   // ----------------------------------------------------------------------------
   
-  // 스위치를 껐다 켜는 작동 방식(함수)을 메모리에 단단히 고정합니다. (useCallback)
-  const toggleDarkMode = useCallback(() => {
-    setIsDarkMode(prev => !prev);
+  // 현재 테마 상태 (기본은 라이트모드)
+  const [isDarkMode, setIsDarkMode] = useState(false);
+
+  useEffect(() => {
+    const loadTheme = async () => {
+      try {
+        const savedTheme = await AsyncStorage.getItem('@checklendar_theme');
+        if (savedTheme !== null) {
+          setIsDarkMode(JSON.parse(savedTheme)); // 저장된 기록이 있으면 덮어씌웁니다.
+        }
+      } catch (e) {
+        console.error('테마 불러오기 오류:', e);
+      }
+    };
+    loadTheme();
   }, []);
 
-  // 보관함에 담을 내용물(현재 상태 + 스위치 조작법)을 메모리에 단단히 고정합니다. (useMemo)
+  // useCallback을 써서 함수가 계속 새로 만들어지는 것을 막습니다.
+  const toggleDarkMode = useCallback(async () => {
+    try {
+      // "현재 상태의 반댓값"으로 설정하는 안전한 방식(함수형 업데이트)을 사용합니다.
+      setIsDarkMode((prevTheme) => {
+        const newTheme = !prevTheme;
+        // 상태를 바꾸는 김에 휴대폰 저장소에도 바로 기록을 남깁니다.
+        AsyncStorage.setItem('@checklendar_theme', JSON.stringify(newTheme)).catch(e => 
+          console.error('테마 저장 오류:', e)
+        );
+        return newTheme; // 새로운 상태 적용!
+      });
+    } catch (e) {
+      console.error('테마 전환 중 오류:', e);
+    }
+  }, []); 
+  // ↑ 의존성 배열을 비워두어([]) 이 함수는 앱이 실행될 때 딱 한 번만 만들어집니다! (최적화 완료)
+
+  // 서랍에 넣을 내용물(상태와 스위치)을 예쁘게 포장해 둡니다. (useMemo로 버벅임 방지)
   const themeValue = useMemo(() => ({
     isDarkMode,
     toggleDarkMode
   }), [isDarkMode, toggleDarkMode]);
 
-  // 아직 폰트가 준비되지 않았다면 아무것도 보여주지 않고 얌전히 기다립니다.
+  // ----------------------------------------------------------------------------
+  // [4. 화면 그리기]
+  // ----------------------------------------------------------------------------
+
+  // 아직 폰트가 덜 불러와졌다면 화면을 그리지 않고 잠깐 대기합니다.
   if (!fontsLoaded) {
     return null;
   }
 
-  // ----------------------------------------------------------------------------
-  // [4. 최종 화면 그리기 및 보관함 열어주기]
-  // ----------------------------------------------------------------------------
+  // 아까 만든 공용 서랍(ThemeContext.Provider)으로 모든 화면을 감싸줍니다.
+  // 이제 index, settings, monthly 화면은 언제든 서랍을 열어 다크모드를 확인할 수 있습니다!
   return (
-    // 아까 만든 보관함(ThemeContext)으로 앱 전체(Stack)를 크게 감싸줍니다.
-    // 이제 이 안에 있는 모든 화면들은 자유롭게 다크모드 상태를 꺼내 쓸 수 있습니다!
     <ThemeContext.Provider value={themeValue}>
+      {/* 화면 이동(내비게이션) 설정 */}
       <Stack screenOptions={{ headerShown: false }} initialRouteName='index'>
-        {/* 이동할 수 있는 화면들의 명세서입니다. (파일 이름과 꼭 같아야 합니다) */}
         <Stack.Screen name="index" />
         <Stack.Screen name="settings" />
+        <Stack.Screen name="monthly" /> {/* 월별 모아보기 화면 */}
       </Stack>
     </ThemeContext.Provider>
   );
