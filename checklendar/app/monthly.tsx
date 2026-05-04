@@ -460,7 +460,7 @@ export default function MonthlyScreen() {
         {/* --- [모달 1] 새 일정 등록 --- */}
         <Modal visible={isModalVisible} animationType="slide" presentationStyle="pageSheet">
           <SafeAreaView style={[styles.modalContainer, { backgroundColor: theme.bg }]}>
-            <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={70}>
+            <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={Platform.OS === 'ios' ? 70 : 20}>
               <ScrollView contentContainerStyle={{ flexGrow: 1 }} keyboardShouldPersistTaps="handled">
                 <View style={[styles.modalHeader, { backgroundColor: theme.card, borderBottomWidth: 1, borderColor: theme.border }]}>
                   <TouchableOpacity onPress={closeModal}><Text style={styles.modalCancelText}>취소</Text></TouchableOpacity>
@@ -475,7 +475,7 @@ export default function MonthlyScreen() {
                 </View>
 
                 <View style={[styles.modalCalendarWrapper, { backgroundColor: theme.card }]}>
-                  <Calendar markingType={'period'} markedDates={modalMarkedDates} theme={{ calendarBackground: theme.card, dayTextColor: theme.text, monthTextColor: theme.text, todayTextColor: '#4A90E2' }} onDayPress={handleDayPressInModal} />
+                  <Calendar markingType={'period'} markedDates={modalMarkedDates} enableSwipeMonths={true} theme={{ calendarBackground: theme.card, dayTextColor: theme.text, monthTextColor: theme.text, todayTextColor: '#4A90E2' }} onDayPress={handleDayPressInModal} />
                 </View>
 
                 <View style={styles.inputSection}>
@@ -491,7 +491,7 @@ export default function MonthlyScreen() {
         {/* 🌟 [모달 2] 일정 내용 및 날짜 수정 --- */}
         <Modal visible={isEditModalVisible} animationType="slide" presentationStyle="pageSheet">
           <SafeAreaView style={[styles.modalContainer, { backgroundColor: theme.bg }]}>
-            <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={70}>
+            <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={Platform.OS === 'ios' ? 70 : 20}>
               <ScrollView contentContainerStyle={{ flexGrow: 1 }} keyboardShouldPersistTaps="handled">
                 <View style={[styles.modalHeader, { backgroundColor: theme.card, borderBottomWidth: 1, borderColor: theme.border }]}>
                   <TouchableOpacity onPress={() => setEditModalVisible(false)}><Text style={styles.modalCancelText}>취소</Text></TouchableOpacity>
@@ -506,7 +506,7 @@ export default function MonthlyScreen() {
                 </View>
 
                 <View style={[styles.modalCalendarWrapper, { backgroundColor: theme.card }]}>
-                  <Calendar markingType={'period'} markedDates={editModalMarkedDates} theme={{ calendarBackground: theme.card, dayTextColor: theme.text, monthTextColor: theme.text, todayTextColor: '#4A90E2' }} onDayPress={handleDayPressInEditModal} />
+                  <Calendar markingType={'period'} markedDates={editModalMarkedDates} enableSwipeMonths={true} theme={{ calendarBackground: theme.card, dayTextColor: theme.text, monthTextColor: theme.text, todayTextColor: '#4A90E2' }} onDayPress={handleDayPressInEditModal} />
                 </View>
 
                 <View style={styles.inputSection}>

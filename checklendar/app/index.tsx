@@ -430,6 +430,7 @@ export default function App() {
               markingType={'custom'}
               markedDates={mainMarkedDates}
               onDayPress={(day: any) => setViewDate(day.dateString)}
+              enableSwipeMonths={true}
               theme={{ 
                 calendarBackground: theme.card, 
                 dayTextColor: theme.text, 
@@ -541,8 +542,8 @@ export default function App() {
         {/* --- [모달 1] 새 일정 등록 --- */}
         <Modal visible={isModalVisible} animationType="slide" presentationStyle="pageSheet">
           <SafeAreaView style={[styles.modalContainer, { backgroundColor: theme.bg }]}>
-            <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={70}>
-              <ScrollView contentContainerStyle={{ flexGrow: 1 }} keyboardShouldPersistTaps="handled">
+            <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={Platform.OS === 'ios' ? 70 : 20}>
+              <ScrollView contentContainerStyle={{ flexGrow: 1, paddingBottom: 40 }} keyboardShouldPersistTaps="handled">
                 <View style={[styles.modalHeader, { backgroundColor: theme.card, borderBottomWidth: 1, borderColor: theme.border }]}>
                   <TouchableOpacity onPress={closeModal}><Text style={styles.modalCancelText}>취소</Text></TouchableOpacity>
                   <Text style={[styles.modalTitle, { color: theme.text }]}>새 일정 추가</Text>
@@ -556,7 +557,7 @@ export default function App() {
                 </View>
 
                 <View style={[styles.modalCalendarWrapper, { backgroundColor: theme.card }]}>
-                  <Calendar markingType={'period'} markedDates={modalMarkedDates} theme={{ calendarBackground: theme.card, dayTextColor: theme.text, monthTextColor: theme.text, todayTextColor: '#4A90E2' }} onDayPress={handleDayPressInModal} />
+                  <Calendar markingType={'period'} markedDates={modalMarkedDates} enableSwipeMonths={true} theme={{ calendarBackground: theme.card, dayTextColor: theme.text, monthTextColor: theme.text, todayTextColor: '#4A90E2' }} onDayPress={handleDayPressInModal} />
                 </View>
 
                 <View style={styles.inputSection}>
@@ -572,8 +573,8 @@ export default function App() {
         {/* 🌟 [모달 2] 일정 내용 및 날짜 수정 --- */}
         <Modal visible={isEditModalVisible} animationType="slide" presentationStyle="pageSheet">
           <SafeAreaView style={[styles.modalContainer, { backgroundColor: theme.bg }]}>
-            <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={70}>
-              <ScrollView contentContainerStyle={{ flexGrow: 1 }} keyboardShouldPersistTaps="handled">
+            <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={Platform.OS === 'ios' ? 70 : 20}>
+              <ScrollView contentContainerStyle={{ flexGrow: 1, paddingBottom: 40 }} keyboardShouldPersistTaps="handled">
                 <View style={[styles.modalHeader, { backgroundColor: theme.card, borderBottomWidth: 1, borderColor: theme.border }]}>
                   <TouchableOpacity onPress={() => setEditModalVisible(false)}><Text style={styles.modalCancelText}>취소</Text></TouchableOpacity>
                   <Text style={[styles.modalTitle, { color: theme.text }]}>일정 수정</Text>
