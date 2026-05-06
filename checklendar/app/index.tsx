@@ -4,34 +4,43 @@ import {
   ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View, 
 } from 'react-native';
 
-// [외부 도구상자]
+// --- 1. 외부 라이브러리 및 공통 모듈 ---
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Stack, router, useFocusEffect } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { Calendar } from 'react-native-calendars';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { GestureHandlerRootView, Swipeable, FlingGestureHandler, Directions, State } from 'react-native-gesture-handler';
+import { GestureHandlerRootView, Swipeable } from 'react-native-gesture-handler';
 
-// [우리 앱 전용 도구상자]
 import { updateNotification } from '../useNotification';
 import { useTheme } from './_layout';
 
-// 🌟 앱이 처음 켜졌는지 확인하는 전역 변수 (월별 화면 자동 전환용)
+// 앱 초기 실행 확인 플래그 (월별 모아보기 화면 자동 전환용)
 let isAppJustLaunched = true;
 
-// ----------------------------------------------------------------------------
-// [1. 데이터 규격서 (Interface)]
-// ----------------------------------------------------------------------------
+// --- 2. 일정 색상 및 유틸리티 ---
+const EVENT_PALETTE = [
+  '#6A5ACD', '#FF7F50', '#40E0D0', '#FF69B4', '#1E90FF', 
+  '#FFA500', '#9370DB', '#20B2AA', '#F08080', '#4682B4',
+];
+
+// 일정 ID를 기반으로 항상 일정한 색상을 반환
+const getTaskColor = (id: string) => {
+  const num = parseInt(id.slice(-6), 10) || 0;
+  return EVENT_PALETTE[num % EVENT_PALETTE.length];
+};
+
+// --- 3. 데이터 타입 정의 ---
 interface Task {
   id: string;              
   text: string;            
-  range: [string, string]; 
-  isDone: boolean;         
+  range: [string, string]; // [시작일, 종료일]
+  isDone: boolean;         // 완료 여부
 }
 
 interface TaskState {
-  [key: string]: Task[];   
+  [key: string]: Task[];   // 날짜별 일정 목록
 }
 
 interface ThemeType {
@@ -45,24 +54,23 @@ interface ThemeType {
 
 const PANEL_HEIGHT = 300;  
 
-// ----------------------------------------------------------------------------
-// [2. 작은 부품: 개별 할 일 카드 (AnimatedTaskItem)]
-// ----------------------------------------------------------------------------
+// --- 4. 개별 할 일 컴포넌트 (스와이프 액션 포함) ---
 const AnimatedTaskItem = ({ item, theme, onToggle, onDelete, onEdit }: { 
   item: Task; 
   theme: ThemeType; 
   onToggle: (id: string) => void; 
   onDelete: (id: string) => void;
-  // 🌟 수정 함수에서 기존 '날짜 범위(range)'도 전달받도록 변경
   onEdit: (id: string, currentText: string, currentRange: [string, string]) => void; 
 }) => {
   const swipeableRef = useRef<Swipeable>(null);
 
+  // 수정 버튼 클릭 시 스와이프 닫고 수정 모달 호출
   const handleEdit = () => {
     swipeableRef.current?.close();
-    onEdit(item.id, item.text, item.range); // 내용과 함께 날짜 정보도 넘겨줍니다.
+    onEdit(item.id, item.text, item.range);
   };
 
+  // 스와이프 시 우측에 나타날 수정/삭제 버튼
   const renderRightActions = () => (
     <View style={styles.actionContainer}>
       <TouchableOpacity onPress={handleEdit} style={styles.editAction} activeOpacity={0.6}>
@@ -107,11 +115,10 @@ const AnimatedTaskItem = ({ item, theme, onToggle, onDelete, onEdit }: {
   );
 };
 
-// ----------------------------------------------------------------------------
-// [3. 메인 화면: 달력과 일정을 보여주는 앱의 중심지]
-// ----------------------------------------------------------------------------
+// --- 5. 메인 앱 화면 ---
 export default function App() {
-
+  
+  // 앱 초기 실행 시 '모아보기(checklist)' 설정이라면 월별 화면으로 이동
   useEffect(() => {
     const checkMainView = async () => {
       try {
@@ -129,20 +136,22 @@ export default function App() {
     checkMainView();
   }, []);
   
-  // --- [A. 상태 공간 (메모리)] ---
+  // [상태 관리] 테마 및 데이터
   const { isDarkMode } = useTheme();                                       
   const [tasks, setTasks] = useState<TaskState>({});                       
   const [viewDate, setViewDate] = useState(new Date().toISOString().split('T')[0]); 
 
+  // [상태 관리] UI 모달 표시 여부
   const [isModalVisible, setModalVisible] = useState(false);               
   const [isMenuVisible, setMenuVisible] = useState(false);                 
   const [isSelecting, setIsSelecting] = useState(false);                   
   
+  // [상태 관리] 새 일정 추가용
   const [addStartDate, setAddStartDate] = useState(viewDate);
   const [addEndDate, setAddEndDate] = useState(viewDate);
   const [taskText, setTaskText] = useState('');
 
-  // 🌟 일정 수정용 메모리 (날짜 선택용 메모리 추가)
+  // [상태 관리] 일정 수정용
   const [isEditModalVisible, setEditModalVisible] = useState(false);
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [editTaskText, setEditTaskText] = useState('');
@@ -150,10 +159,11 @@ export default function App() {
   const [editEndDate, setEditEndDate] = useState(viewDate);
   const [isEditSelecting, setIsEditSelecting] = useState(false);
 
-  // --- [B. 애니메이션 및 디자인 세팅] ---
+  // 하단 메뉴 애니메이션 설정
   const overlayOpacity = useRef(new Animated.Value(0)).current;            
   const panelTranslateY = useRef(new Animated.Value(PANEL_HEIGHT)).current;
 
+  // 다크모드 적용 테마
   const theme = useMemo(() => ({
     bg: isDarkMode ? '#121212' : '#F8F9FA',
     card: isDarkMode ? '#1E1E1E' : '#FFFFFF',
@@ -163,7 +173,7 @@ export default function App() {
     icon: isDarkMode ? '#FFFFFF' : '#333333',
   }), [isDarkMode]);
 
-  // --- [C. 데이터 처리소] ---
+  // 로컬 스토리지에서 일정 불러오기
   useFocusEffect(
     useCallback(() => {
       const loadLatestTasks = async () => {
@@ -171,23 +181,25 @@ export default function App() {
           const savedTasks = await AsyncStorage.getItem('@checklendar_tasks');
           if (savedTasks) setTasks(JSON.parse(savedTasks));
         } catch (e) { 
-          console.error('데이터 불러오기 오류:', e); 
+          console.error(e); 
         }
       };
       loadLatestTasks();
     }, [])
   );
 
+  // 일정을 스토리지에 저장하고 알림 상태 업데이트
   const updateAndSaveTasks = useCallback(async (newTasks: TaskState) => {
     setTasks(newTasks); 
     try {
       await AsyncStorage.setItem('@checklendar_tasks', JSON.stringify(newTasks)); 
       updateNotification(); 
     } catch (e) { 
-      console.error('데이터 저장 오류:', e); 
+      console.error(e); 
     }
   }, []);
 
+  // [기능] 새 일정 저장
   const saveTask = useCallback(() => {
     if (taskText.trim().length === 0) return; 
     
@@ -195,6 +207,7 @@ export default function App() {
     let curr = new Date(`${addStartDate}T00:00:00`); 
     const last = new Date(`${addEndDate}T00:00:00`);
     
+    // 시작일~종료일 사이의 모든 날짜 계산
     while (curr <= last) {
       const y = curr.getFullYear();
       const m = String(curr.getMonth() + 1).padStart(2, '0');
@@ -206,6 +219,7 @@ export default function App() {
     const newTask: Task = { id: Date.now().toString(), text: taskText, range: [addStartDate, addEndDate], isDone: false };
     const updatedTasks = { ...tasks };
     
+    // 해당되는 모든 날짜에 새 일정 삽입
     datesInRange.forEach(date => {
       updatedTasks[date] = [...(updatedTasks[date] || []), newTask];
     });
@@ -215,6 +229,7 @@ export default function App() {
     setModalVisible(false); 
   }, [taskText, addStartDate, addEndDate, tasks, updateAndSaveTasks]);
 
+  // [기능] 일정 완료/미완료 토글
   const toggleTaskCompletion = useCallback((taskId: string) => {
     const updatedTasks = { ...tasks };
     Object.keys(updatedTasks).forEach(date => {
@@ -223,6 +238,7 @@ export default function App() {
     updateAndSaveTasks(updatedTasks); 
   }, [tasks, updateAndSaveTasks]);
 
+  // [기능] 일정 영구 삭제
   const deleteTaskPermanently = useCallback((taskId: string) => {
     const updated = { ...tasks };
     Object.keys(updated).forEach(date => {
@@ -232,21 +248,21 @@ export default function App() {
     updateAndSaveTasks(updated);
   }, [tasks, updateAndSaveTasks]);
 
-  // 🌟 수정 모달 열기 (기존 날짜 데이터를 세팅합니다)
+  // [기능] 수정 모달 열기 및 기존 데이터 세팅
   const openEditModal = useCallback((id: string, currentText: string, currentRange: [string, string]) => {
     setEditingTaskId(id);
     setEditTaskText(currentText);
     setEditStartDate(currentRange[0]);
     setEditEndDate(currentRange[1]);
-    setIsEditSelecting(false); // 선택 상태 초기화
+    setIsEditSelecting(false);
     setEditModalVisible(true);
   }, []);
 
-  // 🌟 수정한 내용과 날짜 저장하기
+  // [기능] 수정된 일정 저장
   const saveEditedTask = useCallback(() => {
     if (!editingTaskId || editTaskText.trim().length === 0) return;
     
-    // 1. 기존 일정의 완료 여부(isDone) 알아내기
+    // 기존 일정의 완료 상태(isDone) 유지하기 위해 찾음
     let currentIsDone = false;
     for (const date in tasks) {
       const foundTask = tasks[date].find(t => t.id === editingTaskId);
@@ -258,17 +274,17 @@ export default function App() {
 
     const updatedTasks = { ...tasks };
 
-    // 2. 기존 일정을 모든 날짜에서 싹 지우기 (날짜가 바뀌었을 수 있으므로 필수)
+    // 1. 기존 날짜들에서 해당 일정 제거
     Object.keys(updatedTasks).forEach(date => {
       updatedTasks[date] = updatedTasks[date].filter(t => t.id !== editingTaskId);
       if (updatedTasks[date].length === 0) delete updatedTasks[date];
     });
 
-    // 3. 새로 수정한 날짜 범위 계산하기
     const datesInRange = [];
     let curr = new Date(`${editStartDate}T00:00:00`); 
     const last = new Date(`${editEndDate}T00:00:00`);
     
+    // 2. 새롭게 수정된 범위의 날짜 계산
     while (curr <= last) {
       const y = curr.getFullYear();
       const m = String(curr.getMonth() + 1).padStart(2, '0');
@@ -277,7 +293,6 @@ export default function App() {
       curr.setDate(curr.getDate() + 1);
     }
 
-    // 4. 새로운 정보로 업데이트된 일정 만들기 (ID와 완료상태는 기존 유지)
     const updatedTask: Task = { 
       id: editingTaskId, 
       text: editTaskText, 
@@ -285,7 +300,7 @@ export default function App() {
       isDone: currentIsDone 
     };
 
-    // 5. 계산된 날짜들에 새 일정 꽂아넣기
+    // 3. 수정된 날짜들에 일정 재삽입
     datesInRange.forEach(date => {
       updatedTasks[date] = [...(updatedTasks[date] || []), updatedTask];
     });
@@ -296,7 +311,7 @@ export default function App() {
     setEditTaskText('');
   }, [editingTaskId, editTaskText, editStartDate, editEndDate, tasks, updateAndSaveTasks]);
 
-  // --- [D. 조작 스위치] ---
+  // [기능] 하단 메뉴 제어 (열기/닫기)
   const handleOpenMenu = useCallback(() => setMenuVisible(true), []);
   const handleCloseMenu = useCallback(() => {
     Animated.parallel([
@@ -314,7 +329,7 @@ export default function App() {
     }
   }, [isMenuVisible, overlayOpacity, panelTranslateY]);
 
-  // '추가' 달력용 날짜 선택
+  // [이벤트] 추가 모달 내 달력 날짜 선택
   const handleDayPressInModal = useCallback((day: any) => {
     const clickedDate = day.dateString;
     if (!isSelecting) {
@@ -329,7 +344,7 @@ export default function App() {
     }
   }, [isSelecting, addStartDate]);
 
-  // 🌟 '수정' 달력용 날짜 선택
+  // [이벤트] 수정 모달 내 달력 날짜 선택
   const handleDayPressInEditModal = useCallback((day: any) => {
     const clickedDate = day.dateString;
     if (!isEditSelecting) {
@@ -344,6 +359,7 @@ export default function App() {
     }
   }, [isEditSelecting, editStartDate]);
 
+  // 메인 달력: 일정이 있는 날짜들을 마킹 처리
   const mainMarkedDates = useMemo(() => {
     const marks: { [key: string]: any } = {};
     Object.keys(tasks).forEach(date => { if (tasks[date].length > 0) marks[date] = { marked: true }; });
@@ -351,6 +367,7 @@ export default function App() {
     return marks;
   }, [tasks, viewDate]);
 
+  // 추가 모달 달력: 선택된 기간의 배경색 칠하기
   const modalMarkedDates = useMemo(() => {
     const marks: { [key: string]: any } = {};
     const range = [];
@@ -372,7 +389,7 @@ export default function App() {
     return marks;
   }, [addStartDate, addEndDate, isDarkMode, theme.text]);
 
-  // 🌟 '수정' 모달 달력의 색칠된 날짜 데이터
+  // 수정 모달 달력: 선택된 기간의 배경색 칠하기
   const editModalMarkedDates = useMemo(() => {
     const marks: { [key: string]: any } = {};
     const range = [];
@@ -403,15 +420,16 @@ export default function App() {
     setModalVisible(true);
   }, [viewDate]);
 
+  // 현재 보고있는 날짜의 일정 목록
   const currentTasks = tasks[viewDate] || [];
 
-  // --- [E. 화면 그리기 (렌더링)] ---
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaView style={[styles.container, { backgroundColor: theme.bg }]}>
         <StatusBar style={isDarkMode ? 'light' : 'dark'} />
         <Stack.Screen options={{ headerShown: false }} />
         
+        {/* 상단 헤더 */}
         <View style={styles.header}>
           <Text style={[styles.headerTitle, { color: theme.text }]}>Checklendar</Text>
           <TouchableOpacity onPress={handleOpenMenu}>
@@ -424,6 +442,7 @@ export default function App() {
           contentContainerStyle={{ paddingBottom: 100 }}
           showsVerticalScrollIndicator={false}
         >
+          {/* 메인 달력 영역 */}
           <View style={[styles.calendarContainer, { backgroundColor: theme.card, borderColor: theme.border }]}>
             <Calendar
               key={isDarkMode ? 'dark' : 'light'}
@@ -442,6 +461,7 @@ export default function App() {
                 }
               }}
               
+              // 달력 날짜(Cell) 커스텀 렌더링
               dayComponent={({date, state}: any) => {
                 if (!date) return <View />;
                 
@@ -478,6 +498,7 @@ export default function App() {
                       </Text>
                     </View>
 
+                    {/* 달력 날짜 안의 미니 일정 표시 (바 또는 점) */}
                     <View style={styles.eventListWrapper}>
                       {dayTasks.slice(0, 3).map((task) => {
                         const isMultiDay = task.range[0] !== task.range[1];
@@ -487,7 +508,7 @@ export default function App() {
                           return (
                             <View key={task.id} style={[
                               styles.eventBar,
-                              { backgroundColor: task.isDone ? '#34C759' : '#6A5ACD' },
+                              { backgroundColor: task.isDone ? '#34C759' : getTaskColor(task.id) },
                               isStart && { borderTopLeftRadius: 4, borderBottomLeftRadius: 4, marginLeft: 2 },
                               isEnd && { borderTopRightRadius: 4, borderBottomRightRadius: 4, width: '95%' }
                             ]}>
@@ -499,7 +520,7 @@ export default function App() {
                         } else {
                           return (
                             <View key={task.id} style={styles.singleEventRow}>
-                              <View style={[styles.singleEventDot, { backgroundColor: task.isDone ? '#34C759' : '#0064FF' }]} />
+                              <View style={[styles.singleEventDot, { backgroundColor: task.isDone ? '#34C759' : getTaskColor(task.id) }]} />
                               <Text style={[styles.singleEventText, { color: theme.text }]} numberOfLines={1}>
                                 {task.text}
                               </Text>
@@ -515,6 +536,7 @@ export default function App() {
             />
           </View>
 
+          {/* 특정 날짜의 할 일 목록 영역 */}
           <View style={styles.listContainer}>
             <Text style={[styles.listTitle, { color: theme.text }]}>{viewDate}의 할 일</Text>
             
@@ -526,7 +548,7 @@ export default function App() {
                   theme={theme} 
                   onToggle={toggleTaskCompletion} 
                   onDelete={deleteTaskPermanently}
-                  onEdit={openEditModal} // 🌟 수정 함수 전달
+                  onEdit={openEditModal}
                 />
               ))
             ) : (
@@ -535,11 +557,12 @@ export default function App() {
           </View>
         </ScrollView>
 
+        {/* 플러스 버튼 (새 일정 추가) */}
         <TouchableOpacity style={styles.fab} onPress={openModal}>
           <Ionicons name="add" size={32} color="#FFF" />
         </TouchableOpacity>
 
-        {/* --- [모달 1] 새 일정 등록 --- */}
+        {/* --- 새 일정 등록 모달 --- */}
         <Modal visible={isModalVisible} animationType="slide" presentationStyle="pageSheet">
           <SafeAreaView style={[styles.modalContainer, { backgroundColor: theme.bg }]}>
             <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={Platform.OS === 'ios' ? 70 : 20}>
@@ -564,13 +587,12 @@ export default function App() {
                   <Text style={[styles.inputLabel, { color: theme.subText }]}>할 일 내용</Text>
                   <TextInput style={[styles.textInput, { backgroundColor: theme.card, color: theme.text, borderColor: theme.border }]} placeholder="어떤 일정이 있나요?" placeholderTextColor={theme.subText} value={taskText} onChangeText={setTaskText} />
                 </View>
-
               </ScrollView>
             </KeyboardAvoidingView>
           </SafeAreaView>
         </Modal>
 
-        {/* 🌟 [모달 2] 일정 내용 및 날짜 수정 --- */}
+        {/* --- 일정 수정 모달 --- */}
         <Modal visible={isEditModalVisible} animationType="slide" presentationStyle="pageSheet">
           <SafeAreaView style={[styles.modalContainer, { backgroundColor: theme.bg }]}>
             <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={Platform.OS === 'ios' ? 70 : 20}>
@@ -595,13 +617,12 @@ export default function App() {
                   <Text style={[styles.inputLabel, { color: theme.subText }]}>할 일 내용</Text>
                   <TextInput style={[styles.textInput, { backgroundColor: theme.card, color: theme.text, borderColor: theme.border }]} placeholder="수정할 내용을 입력하세요" placeholderTextColor={theme.subText} value={editTaskText} onChangeText={setEditTaskText} />
                 </View>
-
               </ScrollView>
             </KeyboardAvoidingView>
           </SafeAreaView>
         </Modal>
 
-        {/* --- [모달 3] 바텀 메뉴 --- */}
+        {/* --- 하단 서랍 메뉴 (BottomSheet) --- */}
         <Modal visible={isMenuVisible} transparent={true} animationType="none">
           <Animated.View style={[styles.menuOverlay, { opacity: overlayOpacity }]}><TouchableOpacity style={styles.overlayTouchArea} activeOpacity={1} onPress={handleCloseMenu} /></Animated.View>
           <Animated.View style={[styles.menuPanel, { backgroundColor: theme.card, transform: [{ translateY: panelTranslateY }] }]}>
@@ -637,9 +658,7 @@ export default function App() {
   );
 }
 
-// ----------------------------------------------------------------------------
-// [4. 디자인 공방 (StyleSheet)]
-// ----------------------------------------------------------------------------
+// --- 6. 스타일 정의 ---
 const styles = StyleSheet.create({
   container: { flex: 1 },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 15 },

@@ -14,9 +14,7 @@ import { Calendar } from 'react-native-calendars';
 import { useTheme } from './_layout';
 import { updateNotification } from '../useNotification'; 
 
-// ----------------------------------------------------------------------------
-// [데이터 설계도]
-// ----------------------------------------------------------------------------
+// 타입 정의
 interface Task {
   id: string;      
   text: string;    
@@ -39,9 +37,7 @@ interface ThemeType {
 
 const PANEL_HEIGHT = 300; 
 
-// ----------------------------------------------------------------------------
-// [작은 부품: 개별 할 일 카드 (스와이프 닫기 제어용)]
-// ----------------------------------------------------------------------------
+// 할 일 아이템 컴포넌트
 const MonthlyTaskItem = ({ item, theme, onToggle, onDelete, onEdit }: { 
   item: Task; 
   theme: ThemeType; 
@@ -52,7 +48,7 @@ const MonthlyTaskItem = ({ item, theme, onToggle, onDelete, onEdit }: {
   const swipeableRef = useRef<Swipeable>(null);
 
   const handleEdit = () => {
-    swipeableRef.current?.close(); // 수정 버튼 누르면 스와이프 닫기
+    swipeableRef.current?.close();
     onEdit(item.id, item.text, item.range);
   };
 
@@ -108,9 +104,9 @@ const MonthlyTaskItem = ({ item, theme, onToggle, onDelete, onEdit }: {
 
 export default function MonthlyScreen() {
   const { isDarkMode } = useTheme();
+  
+  // 상태 관리
   const [tasks, setTasks] = useState<TaskState>({});
-
-  // 모달 및 메뉴 관련 상태
   const [isModalVisible, setModalVisible] = useState(false);               
   const [isMenuVisible, setMenuVisible] = useState(false);                 
   const [isSelecting, setIsSelecting] = useState(false);                   
@@ -120,7 +116,6 @@ export default function MonthlyScreen() {
   const [addEndDate, setAddEndDate] = useState(today);
   const [taskText, setTaskText] = useState('');
 
-  // 🌟 [추가됨] 일정 수정 모달용 상태
   const [isEditModalVisible, setEditModalVisible] = useState(false);
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [editTaskText, setEditTaskText] = useState('');
@@ -128,7 +123,7 @@ export default function MonthlyScreen() {
   const [editEndDate, setEditEndDate] = useState(today);
   const [isEditSelecting, setIsEditSelecting] = useState(false);
 
-  // 애니메이션 설정
+  // 애니메이션 및 테마
   const overlayOpacity = useRef(new Animated.Value(0)).current;            
   const panelTranslateY = useRef(new Animated.Value(PANEL_HEIGHT)).current;
 
@@ -141,9 +136,7 @@ export default function MonthlyScreen() {
     icon: isDarkMode ? '#FFFFFF' : '#333333',
   }), [isDarkMode]);
 
-  // ----------------------------------------------------------------------------
-  // [1. 데이터 불러오기]
-  // ----------------------------------------------------------------------------
+  // 데이터 로드
   useFocusEffect(
     useCallback(() => {
       const loadTasks = async () => {
@@ -158,9 +151,7 @@ export default function MonthlyScreen() {
     }, [])
   );
 
-  // ----------------------------------------------------------------------------
-  // [2. 데이터 조작하기]
-  // ----------------------------------------------------------------------------
+  // 데이터 저장 및 업데이트
   const updateAndSaveTasks = useCallback(async (newTasks: TaskState) => {
     setTasks(newTasks); 
     try {
@@ -215,7 +206,6 @@ export default function MonthlyScreen() {
     setModalVisible(false); 
   }, [taskText, addStartDate, addEndDate, tasks, updateAndSaveTasks]);
 
-  // 🌟 [추가됨] 수정 모달 열기
   const openEditModal = useCallback((id: string, currentText: string, currentRange: [string, string]) => {
     setEditingTaskId(id);
     setEditTaskText(currentText);
@@ -225,7 +215,6 @@ export default function MonthlyScreen() {
     setEditModalVisible(true);
   }, []);
 
-  // 🌟 [추가됨] 수정한 내용과 날짜 저장하기
   const saveEditedTask = useCallback(() => {
     if (!editingTaskId || editTaskText.trim().length === 0) return;
     
@@ -274,9 +263,7 @@ export default function MonthlyScreen() {
     setEditTaskText('');
   }, [editingTaskId, editTaskText, editStartDate, editEndDate, tasks, updateAndSaveTasks]);
 
-  // ----------------------------------------------------------------------------
-  // [3. 모달 및 메뉴 제어]
-  // ----------------------------------------------------------------------------
+  // 모달 및 메뉴 제어
   const handleOpenMenu = useCallback(() => setMenuVisible(true), []);
   const handleCloseMenu = useCallback(() => {
     Animated.parallel([
@@ -308,7 +295,6 @@ export default function MonthlyScreen() {
     }
   }, [isSelecting, addStartDate]);
 
-  // 🌟 [추가됨] 수정 모달에서 날짜 선택
   const handleDayPressInEditModal = useCallback((day: any) => {
     const clickedDate = day.dateString;
     if (!isEditSelecting) {
@@ -344,7 +330,6 @@ export default function MonthlyScreen() {
     return marks;
   }, [addStartDate, addEndDate, isDarkMode, theme.text]);
 
-  // 🌟 [추가됨] 수정 모달 달력 색칠
   const editModalMarkedDates = useMemo(() => {
     const marks: { [key: string]: any } = {};
     const range = [];
@@ -375,9 +360,7 @@ export default function MonthlyScreen() {
     setModalVisible(true);
   }, [today]);
 
-  // ----------------------------------------------------------------------------
-  // [4. 데이터 가공 (월별 그룹화)]
-  // ----------------------------------------------------------------------------
+  // 데이터 가공 (월별 그룹화)
   const sections = useMemo(() => {
     const uniqueTasks = new Map<string, Task>();
 
@@ -410,9 +393,7 @@ export default function MonthlyScreen() {
       });
   }, [tasks]);
 
-  // ----------------------------------------------------------------------------
-  // [5. 화면 그리기 (UI)]
-  // ----------------------------------------------------------------------------
+  // UI 렌더링
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaView style={[styles.container, { backgroundColor: theme.bg }]}>
@@ -437,7 +418,6 @@ export default function MonthlyScreen() {
             <Text style={[styles.sectionTitle, { color: theme.text }]}>{title}</Text>
           )}
 
-          // 🌟 [수정됨] 개별 카드를 분리된 컴포넌트로 렌더링
           renderItem={({ item }) => (
             <MonthlyTaskItem 
               item={item} 
@@ -457,7 +437,7 @@ export default function MonthlyScreen() {
           <Ionicons name="add" size={32} color="#FFF" />
         </TouchableOpacity>
 
-        {/* --- [모달 1] 새 일정 등록 --- */}
+        {/* 새 일정 등록 모달 */}
         <Modal visible={isModalVisible} animationType="slide" presentationStyle="pageSheet">
           <SafeAreaView style={[styles.modalContainer, { backgroundColor: theme.bg }]}>
             <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={Platform.OS === 'ios' ? 70 : 20}>
@@ -488,7 +468,7 @@ export default function MonthlyScreen() {
           </SafeAreaView>
         </Modal>
 
-        {/* 🌟 [모달 2] 일정 내용 및 날짜 수정 --- */}
+        {/* 일정 수정 모달 */}
         <Modal visible={isEditModalVisible} animationType="slide" presentationStyle="pageSheet">
           <SafeAreaView style={[styles.modalContainer, { backgroundColor: theme.bg }]}>
             <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={Platform.OS === 'ios' ? 70 : 20}>
@@ -519,7 +499,7 @@ export default function MonthlyScreen() {
           </SafeAreaView>
         </Modal>
 
-        {/* --- [모달 3] 바텀 메뉴 --- */}
+        {/* 바텀 메뉴 */}
         <Modal visible={isMenuVisible} transparent={true} animationType="none">
           <Animated.View style={[styles.menuOverlay, { opacity: overlayOpacity }]}><TouchableOpacity style={styles.overlayTouchArea} activeOpacity={1} onPress={handleCloseMenu} /></Animated.View>
           <Animated.View style={[styles.menuPanel, { backgroundColor: theme.card, transform: [{ translateY: panelTranslateY }] }]}>
@@ -555,9 +535,7 @@ export default function MonthlyScreen() {
   );
 }
 
-// ----------------------------------------------------------------------------
-// [스타일 정의]
-// ----------------------------------------------------------------------------
+// 스타일 정의
 const styles = StyleSheet.create({
   container: { flex: 1 },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 15 },
@@ -569,7 +547,6 @@ const styles = StyleSheet.create({
   taskText: { fontSize: 16, fontWeight: '600' },
   taskRange: { fontSize: 12, marginTop: 4 },
   
-  // 🌟 [추가됨] 스와이프 액션 버튼 컨테이너
   actionContainer: { flexDirection: 'row', marginBottom: 12, marginLeft: 10 },
   editAction: { backgroundColor: '#4A90E2', justifyContent: 'center', alignItems: 'center', width: 65, borderRadius: 15 },
   deleteAction: { backgroundColor: '#FF3B30', justifyContent: 'center', alignItems: 'center', width: 65, borderRadius: 15, marginLeft: 8 },

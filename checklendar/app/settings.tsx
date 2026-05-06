@@ -4,7 +4,6 @@ import {
   ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View, Switch
 } from 'react-native';
 
-// [외부 도구상자]
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Stack, router, useFocusEffect } from 'expo-router';
@@ -12,15 +11,12 @@ import { StatusBar } from 'expo-status-bar';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-// [우리 앱 전용 도구상자]
 import { updateNotification } from '../useNotification';
 import { useTheme } from './_layout';
 
 export default function SettingsScreen() {
 
-  // ----------------------------------------------------------------------------
-  // [1. 화면 상태 및 데이터 관리]
-  // ----------------------------------------------------------------------------
+  // 화면 상태 및 데이터 관리
   const { isDarkMode, toggleDarkMode } = useTheme(); 
   
   const [isNotiEnabled, setIsNotiEnabled] = useState(false); 
@@ -28,12 +24,9 @@ export default function SettingsScreen() {
   const [showPicker, setShowPicker] = useState(false);       
   const [tempNotiTime, setTempNotiTime] = useState(new Date());
 
-  // 🌟 [추가됨] 메인 화면 설정 (false = 캘린더, true = 체크리스트)
   const [isChecklistView, setIsChecklistView] = useState(false);
 
-  // ----------------------------------------------------------------------------
-  // [2. 테마 및 부드러운 애니메이션 설정]
-  // ----------------------------------------------------------------------------
+  // 테마 및 부드러운 애니메이션 설정
   const themeAnim = useRef(new Animated.Value(isDarkMode ? 1 : 0)).current;
   
   const modalOpacity = useRef(new Animated.Value(0)).current;      
@@ -47,14 +40,12 @@ export default function SettingsScreen() {
     subTextColor: themeAnim.interpolate({ inputRange: [0, 1], outputRange: ['#888888', '#AAAAAA'] })
   }), [themeAnim]);
 
-  // ----------------------------------------------------------------------------
-  // [3. 설정 불러오기 (초기 세팅)]
-  // ----------------------------------------------------------------------------
+  // 설정 불러오기
   const loadSettings = async () => {
     try {
       const savedEnabled = await AsyncStorage.getItem('notiEnabled');
       const savedTime = await AsyncStorage.getItem('notiTime');
-      const savedView = await AsyncStorage.getItem('@main_view'); // 🌟 시작 화면 설정 불러오기
+      const savedView = await AsyncStorage.getItem('@main_view');
       
       if (savedEnabled !== null) setIsNotiEnabled(JSON.parse(savedEnabled));
       if (savedTime !== null) setNotiTime(new Date(savedTime));
@@ -76,11 +67,7 @@ export default function SettingsScreen() {
     loadSettings();
   }, []);
 
-  // ----------------------------------------------------------------------------
-  // [4. 사용자 동작 핸들러 (버튼 눌렀을 때의 반응)]
-  // ----------------------------------------------------------------------------
-  
-  // 🌟 [추가됨] 시작 화면 스위치 조작
+  // 사용자 동작 핸들러
   const handleToggleView = async (value: boolean) => {
     setIsChecklistView(value);
     await AsyncStorage.setItem('@main_view', value ? 'checklist' : 'calendar');
@@ -140,9 +127,7 @@ export default function SettingsScreen() {
     updateNotification(); 
   };
 
-  // ----------------------------------------------------------------------------
-  // [5. 화면 그리기 (UI 배치)]
-  // ----------------------------------------------------------------------------
+  // UI 렌더링
   return (
     <Animated.View style={[styles.container, { backgroundColor: animatedColors.bgColor }]}>
       <StatusBar style={isDarkMode ? 'light' : 'dark'} />
@@ -179,7 +164,6 @@ export default function SettingsScreen() {
           <Switch trackColor={{ false: "#767577", true: "#4A90E2" }} thumbColor={Platform.OS === 'ios' ? undefined : "#f4f3f4"} onValueChange={toggleDarkMode} value={isDarkMode} />
         </Animated.View>
 
-        {/* 🌟 [추가됨] 시작 화면 설정 */}
         <Animated.View style={[styles.settingItem, { backgroundColor: animatedColors.itemBgColor }]}>
           <View style={styles.settingLabel}>
             <Ionicons name="list" size={22} color={isDarkMode ? "#FFD700" : "#4A90E2"} />
@@ -212,7 +196,7 @@ export default function SettingsScreen() {
           </TouchableOpacity>
         )}
 
-        {/* [아이폰용] 모달 */}
+        {/* iOS용 시간 선택 모달 */}
         {Platform.OS === 'ios' && (
           <Modal visible={showPicker} transparent={true} animationType="none" onRequestClose={closePicker}>
             <Animated.View style={[styles.modalBackdropWrapper, { opacity: modalOpacity }]}>
@@ -238,7 +222,7 @@ export default function SettingsScreen() {
 
       </SafeAreaView>
 
-      {/* [안드로이드용] 모달 */}
+      {/* 안드로이드용 시간 선택 모달 */}
       {Platform.OS === 'android' && showPicker && (
         <DateTimePicker value={notiTime} mode="time" display="default" onChange={handleAndroidTimeChange} />
       )}
@@ -247,9 +231,7 @@ export default function SettingsScreen() {
   );
 }
 
-// ----------------------------------------------------------------------------
-// [6. 화면 디자인 (스타일 설정)]
-// ----------------------------------------------------------------------------
+// 스타일 설정
 const styles = StyleSheet.create({
   container: { flex: 1 },
   content: { flex: 1, paddingHorizontal: 20, paddingTop: 10 },
