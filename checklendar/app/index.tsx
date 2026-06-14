@@ -221,7 +221,7 @@ export default function App() {
     }
   }, []);
 
-  // 🌟 [기능] 해당 날짜 범위에 사용되지 않은 빈 색상 찾기 로직
+  // [기능] 해당 날짜 범위에 사용되지 않은 빈 색상 찾기 로직
   const getAvailableColor = useCallback((currentTasks: TaskState, start: string, end: string) => {
     const usedColors = new Set<string>();
     let curr = new Date(`${start}T00:00:00`); 
