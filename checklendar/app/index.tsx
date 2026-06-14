@@ -4,7 +4,7 @@ import {
   ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View, 
 } from 'react-native';
 
-// --- 1. 외부 라이브러리 및 공통 모듈 ---
+// --- [외부 라이브러리 및 공통 모듈] ---
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Stack, router, useFocusEffect } from 'expo-router';
@@ -19,24 +19,39 @@ import { useTheme } from './_layout';
 // 앱 초기 실행 확인 플래그 (월별 모아보기 화면 자동 전환용)
 let isAppJustLaunched = true;
 
-// --- 2. 일정 색상 및 유틸리티 ---
+// --- [일정 색상 및 유틸리티] ---
 const EVENT_PALETTE = [
   '#6A5ACD', '#FF7F50', '#40E0D0', '#FF69B4', '#1E90FF', 
   '#FFA500', '#9370DB', '#20B2AA', '#F08080', '#4682B4',
 ];
 
-// 일정 ID를 기반으로 항상 일정한 색상을 반환
+const COLOR_OPTIONS = [
+  { label: '자동 선택 (겹치지 않게)', value: null },
+  { label: '보라색', value: '#6A5ACD' },
+  { label: '코랄색', value: '#FF7F50' },
+  { label: '청록색', value: '#40E0D0' },
+  { label: '핫핑크', value: '#FF69B4' },
+  { label: '딥블루', value: '#1E90FF' },
+  { label: '오렌지', value: '#FFA500' },
+  { label: '연보라', value: '#9370DB' },
+  { label: '씨그린', value: '#20B2AA' },
+  { label: '라이트 코랄', value: '#F08080' },
+  { label: '스틸 블루', value: '#4682B4' },
+];
+
+// 일정 ID를 기반으로 구형 데이터에 일정한 색상을 반환 (하위 호환용)
 const getTaskColor = (id: string) => {
   const num = parseInt(id.slice(-6), 10) || 0;
   return EVENT_PALETTE[num % EVENT_PALETTE.length];
 };
 
-// --- 3. 데이터 타입 정의 ---
+// --- [데이터 타입 정의] ---
 interface Task {
   id: string;              
   text: string;            
   range: [string, string]; // [시작일, 종료일]
   isDone: boolean;         // 완료 여부
+  color?: string | null;   // 개별 지정 색상 추가
 }
 
 interface TaskState {
@@ -54,23 +69,22 @@ interface ThemeType {
 
 const PANEL_HEIGHT = 300;  
 
-// --- 4. 개별 할 일 컴포넌트 (스와이프 액션 포함) ---
+// --- [개별 할 일 컴포넌트 (스와이프 액션 포함)] ---
 const AnimatedTaskItem = ({ item, theme, onToggle, onDelete, onEdit }: { 
   item: Task; 
   theme: ThemeType; 
   onToggle: (id: string) => void; 
   onDelete: (id: string) => void;
-  onEdit: (id: string, currentText: string, currentRange: [string, string]) => void; 
+  onEdit: (id: string, currentText: string, currentRange: [string, string], currentColor?: string | null) => void; 
 }) => {
   const swipeableRef = useRef<Swipeable>(null);
 
-  // 수정 버튼 클릭 시 스와이프 닫고 수정 모달 호출
+  // 수정 버튼 클릭 시 스와이프 닫고 수정 모달 호출 (색상 정보도 전달)
   const handleEdit = () => {
     swipeableRef.current?.close();
-    onEdit(item.id, item.text, item.range);
+    onEdit(item.id, item.text, item.range, item.color);
   };
 
-  // 스와이프 시 우측에 나타날 수정/삭제 버튼
   const renderRightActions = () => (
     <View style={styles.actionContainer}>
       <TouchableOpacity onPress={handleEdit} style={styles.editAction} activeOpacity={0.6}>
@@ -87,7 +101,7 @@ const AnimatedTaskItem = ({ item, theme, onToggle, onDelete, onEdit }: {
 
   return (
     <Swipeable ref={swipeableRef} renderRightActions={renderRightActions} friction={2} overshootRight={false}>
-      <View style={[styles.todoItem, { backgroundColor: theme.card }]}>
+      <View style={[styles.todoItem, { backgroundColor: theme.card, borderLeftWidth: 4, borderLeftColor: item.isDone ? '#34C759' : (item.color || getTaskColor(item.id)) }]}>
         <TouchableOpacity activeOpacity={0.7} onPress={() => onToggle(item.id)} style={styles.todoContent}>
           <View style={{ flex: 1 }}>
             <Text style={[
@@ -115,10 +129,9 @@ const AnimatedTaskItem = ({ item, theme, onToggle, onDelete, onEdit }: {
   );
 };
 
-// --- 5. 메인 앱 화면 ---
+// --- [메인 앱 화면] ---
 export default function App() {
   
-  // 앱 초기 실행 시 '모아보기(checklist)' 설정이라면 월별 화면으로 이동
   useEffect(() => {
     const checkMainView = async () => {
       try {
@@ -140,6 +153,7 @@ export default function App() {
   const { isDarkMode } = useTheme();                                       
   const [tasks, setTasks] = useState<TaskState>({});                       
   const [viewDate, setViewDate] = useState(new Date().toISOString().split('T')[0]); 
+  const [monthFormat, setMonthFormat] = useState('yyyy년 MM월');
 
   // [상태 관리] UI 모달 표시 여부
   const [isModalVisible, setModalVisible] = useState(false);               
@@ -150,6 +164,8 @@ export default function App() {
   const [addStartDate, setAddStartDate] = useState(viewDate);
   const [addEndDate, setAddEndDate] = useState(viewDate);
   const [taskText, setTaskText] = useState('');
+  const [taskColor, setTaskColor] = useState<string | null>(null); // 새 일정 색상
+  const [isColorDropdownOpen, setIsColorDropdownOpen] = useState(false);
 
   // [상태 관리] 일정 수정용
   const [isEditModalVisible, setEditModalVisible] = useState(false);
@@ -157,7 +173,9 @@ export default function App() {
   const [editTaskText, setEditTaskText] = useState('');
   const [editStartDate, setEditStartDate] = useState(viewDate);
   const [editEndDate, setEditEndDate] = useState(viewDate);
+  const [editTaskColor, setEditTaskColor] = useState<string | null>(null); // 수정 일정 색상
   const [isEditSelecting, setIsEditSelecting] = useState(false);
+  const [isEditColorDropdownOpen, setIsEditColorDropdownOpen] = useState(false);
 
   // 하단 메뉴 애니메이션 설정
   const overlayOpacity = useRef(new Animated.Value(0)).current;            
@@ -173,13 +191,18 @@ export default function App() {
     icon: isDarkMode ? '#FFFFFF' : '#333333',
   }), [isDarkMode]);
 
-  // 로컬 스토리지에서 일정 불러오기
+  // 로컬 스토리지에서 데이터 불러오기
   useFocusEffect(
     useCallback(() => {
       const loadLatestTasks = async () => {
         try {
           const savedTasks = await AsyncStorage.getItem('@checklendar_tasks');
           if (savedTasks) setTasks(JSON.parse(savedTasks));
+        
+          const savedMonthFormat = await AsyncStorage.getItem('@month_format');
+          if (savedMonthFormat !== null) {
+            setMonthFormat(savedMonthFormat);
+          }
         } catch (e) { 
           console.error(e); 
         }
@@ -188,7 +211,6 @@ export default function App() {
     }, [])
   );
 
-  // 일정을 스토리지에 저장하고 알림 상태 업데이트
   const updateAndSaveTasks = useCallback(async (newTasks: TaskState) => {
     setTasks(newTasks); 
     try {
@@ -199,6 +221,32 @@ export default function App() {
     }
   }, []);
 
+  // 🌟 [기능] 해당 날짜 범위에 사용되지 않은 빈 색상 찾기 로직
+  const getAvailableColor = useCallback((currentTasks: TaskState, start: string, end: string) => {
+    const usedColors = new Set<string>();
+    let curr = new Date(`${start}T00:00:00`); 
+    const last = new Date(`${end}T00:00:00`);
+    
+    // 선택된 범위 내의 모든 날짜를 순회하며 이미 쓰인 색상을 수집
+    while (curr <= last) {
+      const y = curr.getFullYear();
+      const m = String(curr.getMonth() + 1).padStart(2, '0');
+      const d = String(curr.getDate()).padStart(2, '0');
+      const dateStr = `${y}-${m}-${d}`;
+      
+      if (currentTasks[dateStr]) {
+        currentTasks[dateStr].forEach(t => {
+          usedColors.add(t.color || getTaskColor(t.id));
+        });
+      }
+      curr.setDate(curr.getDate() + 1);
+    }
+    
+    // 팔레트 색상 중 안 쓰인 색상 첫 번째 것을 반환
+    const available = EVENT_PALETTE.find(c => !usedColors.has(c));
+    return available || EVENT_PALETTE[Math.floor(Math.random() * EVENT_PALETTE.length)];
+  }, []);
+
   // [기능] 새 일정 저장
   const saveTask = useCallback(() => {
     if (taskText.trim().length === 0) return; 
@@ -207,7 +255,6 @@ export default function App() {
     let curr = new Date(`${addStartDate}T00:00:00`); 
     const last = new Date(`${addEndDate}T00:00:00`);
     
-    // 시작일~종료일 사이의 모든 날짜 계산
     while (curr <= last) {
       const y = curr.getFullYear();
       const m = String(curr.getMonth() + 1).padStart(2, '0');
@@ -216,10 +263,11 @@ export default function App() {
       curr.setDate(curr.getDate() + 1);
     }
 
-    const newTask: Task = { id: Date.now().toString(), text: taskText, range: [addStartDate, addEndDate], isDone: false };
-    const updatedTasks = { ...tasks };
+    // 사용자가 색상을 고르지 않았다면 자동 할당
+    const finalColor = taskColor || getAvailableColor(tasks, addStartDate, addEndDate);
+    const newTask: Task = { id: Date.now().toString(), text: taskText, range: [addStartDate, addEndDate], isDone: false, color: finalColor };
     
-    // 해당되는 모든 날짜에 새 일정 삽입
+    const updatedTasks = { ...tasks };
     datesInRange.forEach(date => {
       updatedTasks[date] = [...(updatedTasks[date] || []), newTask];
     });
@@ -227,7 +275,7 @@ export default function App() {
     updateAndSaveTasks(updatedTasks); 
     setTaskText(''); 
     setModalVisible(false); 
-  }, [taskText, addStartDate, addEndDate, tasks, updateAndSaveTasks]);
+  }, [taskText, addStartDate, addEndDate, taskColor, tasks, updateAndSaveTasks, getAvailableColor]);
 
   // [기능] 일정 완료/미완료 토글
   const toggleTaskCompletion = useCallback((taskId: string) => {
@@ -249,12 +297,14 @@ export default function App() {
   }, [tasks, updateAndSaveTasks]);
 
   // [기능] 수정 모달 열기 및 기존 데이터 세팅
-  const openEditModal = useCallback((id: string, currentText: string, currentRange: [string, string]) => {
+  const openEditModal = useCallback((id: string, currentText: string, currentRange: [string, string], currentColor?: string | null) => {
     setEditingTaskId(id);
     setEditTaskText(currentText);
     setEditStartDate(currentRange[0]);
     setEditEndDate(currentRange[1]);
+    setEditTaskColor(currentColor || null); // 기존 색상 불러오기
     setIsEditSelecting(false);
+    setIsEditColorDropdownOpen(false);
     setEditModalVisible(true);
   }, []);
 
@@ -262,7 +312,6 @@ export default function App() {
   const saveEditedTask = useCallback(() => {
     if (!editingTaskId || editTaskText.trim().length === 0) return;
     
-    // 기존 일정의 완료 상태(isDone) 유지하기 위해 찾음
     let currentIsDone = false;
     for (const date in tasks) {
       const foundTask = tasks[date].find(t => t.id === editingTaskId);
@@ -274,7 +323,6 @@ export default function App() {
 
     const updatedTasks = { ...tasks };
 
-    // 1. 기존 날짜들에서 해당 일정 제거
     Object.keys(updatedTasks).forEach(date => {
       updatedTasks[date] = updatedTasks[date].filter(t => t.id !== editingTaskId);
       if (updatedTasks[date].length === 0) delete updatedTasks[date];
@@ -284,7 +332,6 @@ export default function App() {
     let curr = new Date(`${editStartDate}T00:00:00`); 
     const last = new Date(`${editEndDate}T00:00:00`);
     
-    // 2. 새롭게 수정된 범위의 날짜 계산
     while (curr <= last) {
       const y = curr.getFullYear();
       const m = String(curr.getMonth() + 1).padStart(2, '0');
@@ -293,14 +340,16 @@ export default function App() {
       curr.setDate(curr.getDate() + 1);
     }
 
+    // 수정 시에도 색상이 비어있다면 자동 색상 탐색 적용
+    const finalColor = editTaskColor || getAvailableColor(updatedTasks, editStartDate, editEndDate);
     const updatedTask: Task = { 
       id: editingTaskId, 
       text: editTaskText, 
       range: [editStartDate, editEndDate], 
-      isDone: currentIsDone 
+      isDone: currentIsDone,
+      color: finalColor
     };
 
-    // 3. 수정된 날짜들에 일정 재삽입
     datesInRange.forEach(date => {
       updatedTasks[date] = [...(updatedTasks[date] || []), updatedTask];
     });
@@ -309,9 +358,8 @@ export default function App() {
     setEditModalVisible(false);
     setEditingTaskId(null);
     setEditTaskText('');
-  }, [editingTaskId, editTaskText, editStartDate, editEndDate, tasks, updateAndSaveTasks]);
+  }, [editingTaskId, editTaskText, editStartDate, editEndDate, editTaskColor, tasks, updateAndSaveTasks, getAvailableColor]);
 
-  // [기능] 하단 메뉴 제어 (열기/닫기)
   const handleOpenMenu = useCallback(() => setMenuVisible(true), []);
   const handleCloseMenu = useCallback(() => {
     Animated.parallel([
@@ -329,7 +377,6 @@ export default function App() {
     }
   }, [isMenuVisible, overlayOpacity, panelTranslateY]);
 
-  // [이벤트] 추가 모달 내 달력 날짜 선택
   const handleDayPressInModal = useCallback((day: any) => {
     const clickedDate = day.dateString;
     if (!isSelecting) {
@@ -344,7 +391,6 @@ export default function App() {
     }
   }, [isSelecting, addStartDate]);
 
-  // [이벤트] 수정 모달 내 달력 날짜 선택
   const handleDayPressInEditModal = useCallback((day: any) => {
     const clickedDate = day.dateString;
     if (!isEditSelecting) {
@@ -359,7 +405,6 @@ export default function App() {
     }
   }, [isEditSelecting, editStartDate]);
 
-  // 메인 달력: 일정이 있는 날짜들을 마킹 처리
   const mainMarkedDates = useMemo(() => {
     const marks: { [key: string]: any } = {};
     Object.keys(tasks).forEach(date => { if (tasks[date].length > 0) marks[date] = { marked: true }; });
@@ -367,7 +412,6 @@ export default function App() {
     return marks;
   }, [tasks, viewDate]);
 
-  // 추가 모달 달력: 선택된 기간의 배경색 칠하기
   const modalMarkedDates = useMemo(() => {
     const marks: { [key: string]: any } = {};
     const range = [];
@@ -389,7 +433,6 @@ export default function App() {
     return marks;
   }, [addStartDate, addEndDate, isDarkMode, theme.text]);
 
-  // 수정 모달 달력: 선택된 기간의 배경색 칠하기
   const editModalMarkedDates = useMemo(() => {
     const marks: { [key: string]: any } = {};
     const range = [];
@@ -417,10 +460,11 @@ export default function App() {
     setAddStartDate(viewDate); 
     setAddEndDate(viewDate); 
     setTaskText(''); 
+    setTaskColor(null); // 추가 모달 열 때 색상 초기화
+    setIsColorDropdownOpen(false);
     setModalVisible(true);
   }, [viewDate]);
 
-  // 현재 보고있는 날짜의 일정 목록
   const currentTasks = tasks[viewDate] || [];
 
   return (
@@ -437,19 +481,16 @@ export default function App() {
           </TouchableOpacity>
         </View>
 
-        <ScrollView 
-          style={{ flex: 1 }}
-          contentContainerStyle={{ paddingBottom: 100 }}
-          showsVerticalScrollIndicator={false}
-        >
+        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
           {/* 메인 달력 영역 */}
           <View style={[styles.calendarContainer, { backgroundColor: theme.card, borderColor: theme.border }]}>
             <Calendar
-              key={isDarkMode ? 'dark' : 'light'}
+              key={`${isDarkMode ? 'dark' : 'light'}_${monthFormat}`}
               markingType={'custom'}
               markedDates={mainMarkedDates}
               onDayPress={(day: any) => setViewDate(day.dateString)}
               enableSwipeMonths={true}
+              monthFormat={monthFormat}
               theme={{ 
                 calendarBackground: theme.card, 
                 dayTextColor: theme.text, 
@@ -461,7 +502,7 @@ export default function App() {
                 }
               }}
               
-              // 달력 날짜(Cell) 커스텀 렌더링
+              // 달력 안의 미니 일정 표시 렌더링
               dayComponent={({date, state}: any) => {
                 if (!date) return <View />;
                 
@@ -498,17 +539,19 @@ export default function App() {
                       </Text>
                     </View>
 
-                    {/* 달력 날짜 안의 미니 일정 표시 (바 또는 점) */}
                     <View style={styles.eventListWrapper}>
                       {dayTasks.slice(0, 3).map((task) => {
                         const isMultiDay = task.range[0] !== task.range[1];
+                        // 저장된 색상이 있으면 우선 사용하고 없으면 ID 기반 사용
+                        const itemColor = task.color || getTaskColor(task.id);
+                        
                         if (isMultiDay) {
                           const isStart = task.range[0] === date.dateString;
                           const isEnd = task.range[1] === date.dateString;
                           return (
                             <View key={task.id} style={[
                               styles.eventBar,
-                              { backgroundColor: task.isDone ? '#34C759' : getTaskColor(task.id) },
+                              { backgroundColor: task.isDone ? '#34C759' : itemColor },
                               isStart && { borderTopLeftRadius: 4, borderBottomLeftRadius: 4, marginLeft: 2 },
                               isEnd && { borderTopRightRadius: 4, borderBottomRightRadius: 4, width: '95%' }
                             ]}>
@@ -520,7 +563,7 @@ export default function App() {
                         } else {
                           return (
                             <View key={task.id} style={styles.singleEventRow}>
-                              <View style={[styles.singleEventDot, { backgroundColor: task.isDone ? '#34C759' : getTaskColor(task.id) }]} />
+                              <View style={[styles.singleEventDot, { backgroundColor: task.isDone ? '#34C759' : itemColor }]} />
                               <Text style={[styles.singleEventText, { color: theme.text }]} numberOfLines={1}>
                                 {task.text}
                               </Text>
@@ -557,12 +600,11 @@ export default function App() {
           </View>
         </ScrollView>
 
-        {/* 플러스 버튼 (새 일정 추가) */}
         <TouchableOpacity style={styles.fab} onPress={openModal}>
           <Ionicons name="add" size={32} color="#FFF" />
         </TouchableOpacity>
 
-        {/* --- 새 일정 등록 모달 --- */}
+        {/* --- [모달] 새 일정 등록 --- */}
         <Modal visible={isModalVisible} animationType="slide" presentationStyle="pageSheet">
           <SafeAreaView style={[styles.modalContainer, { backgroundColor: theme.bg }]}>
             <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={Platform.OS === 'ios' ? 70 : 20}>
@@ -580,19 +622,54 @@ export default function App() {
                 </View>
 
                 <View style={[styles.modalCalendarWrapper, { backgroundColor: theme.card }]}>
-                  <Calendar markingType={'period'} markedDates={modalMarkedDates} enableSwipeMonths={true} theme={{ calendarBackground: theme.card, dayTextColor: theme.text, monthTextColor: theme.text, todayTextColor: '#4A90E2' }} onDayPress={handleDayPressInModal} />
+                  <Calendar 
+                    key={`add_${isDarkMode ? 'dark' : 'light'}_${monthFormat}`}
+                    monthFormat={monthFormat} 
+                    markingType={'period'} markedDates={modalMarkedDates} enableSwipeMonths={true} theme={{ calendarBackground: theme.card, dayTextColor: theme.text, monthTextColor: theme.text, todayTextColor: '#4A90E2' }} onDayPress={handleDayPressInModal} />
                 </View>
 
+                {/* 입력 폼 섹션 */}
                 <View style={styles.inputSection}>
                   <Text style={[styles.inputLabel, { color: theme.subText }]}>할 일 내용</Text>
-                  <TextInput style={[styles.textInput, { backgroundColor: theme.card, color: theme.text, borderColor: theme.border }]} placeholder="어떤 일정이 있나요?" placeholderTextColor={theme.subText} value={taskText} onChangeText={setTaskText} />
+                  <TextInput style={[styles.textInput, { backgroundColor: theme.card, color: theme.text, borderColor: theme.border, marginBottom: 20 }]} placeholder="어떤 일정이 있나요?" placeholderTextColor={theme.subText} value={taskText} onChangeText={setTaskText} />
+
+                  {/* 색상 선택 드롭다운 */}
+                  <Text style={[styles.inputLabel, { color: theme.subText }]}>일정 색상</Text>
+                  <TouchableOpacity onPress={() => setIsColorDropdownOpen(!isColorDropdownOpen)} activeOpacity={0.7}>
+                    <View style={[styles.dropdownHeader, { backgroundColor: theme.card, borderColor: theme.border }, isColorDropdownOpen && styles.dropdownOpenRadius]}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        <View style={[styles.colorCircle, { backgroundColor: taskColor || '#E0E0E0' }]} />
+                        <Text style={{ color: theme.text, marginLeft: 10 }}>
+                          {taskColor ? COLOR_OPTIONS.find(c => c.value === taskColor)?.label : '자동 선택 (겹치지 않는 색)'}
+                        </Text>
+                      </View>
+                      <Ionicons name={isColorDropdownOpen ? "chevron-up" : "chevron-down"} size={20} color={theme.subText} />
+                    </View>
+                  </TouchableOpacity>
+                  
+                  {isColorDropdownOpen && (
+                    <View style={[styles.dropdownList, { backgroundColor: theme.card, borderColor: theme.border }]}>
+                      {COLOR_OPTIONS.map((option, idx) => {
+                        const isLast = idx === COLOR_OPTIONS.length - 1;
+                        return (
+                          <TouchableOpacity key={option.label} style={[styles.dropdownItem, isLast && { borderBottomWidth: 0 }]} onPress={() => { setTaskColor(option.value); setIsColorDropdownOpen(false); }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                              <View style={[styles.colorCircle, { backgroundColor: option.value || '#E0E0E0' }]} />
+                              <Text style={{ color: theme.text, marginLeft: 10 }}>{option.label}</Text>
+                            </View>
+                            {taskColor === option.value && <Ionicons name="checkmark" size={20} color="#4A90E2" />}
+                          </TouchableOpacity>
+                        )
+                      })}
+                    </View>
+                  )}
                 </View>
               </ScrollView>
             </KeyboardAvoidingView>
           </SafeAreaView>
         </Modal>
 
-        {/* --- 일정 수정 모달 --- */}
+        {/* --- [모달] 일정 수정 --- */}
         <Modal visible={isEditModalVisible} animationType="slide" presentationStyle="pageSheet">
           <SafeAreaView style={[styles.modalContainer, { backgroundColor: theme.bg }]}>
             <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={Platform.OS === 'ios' ? 70 : 20}>
@@ -610,19 +687,54 @@ export default function App() {
                 </View>
 
                 <View style={[styles.modalCalendarWrapper, { backgroundColor: theme.card }]}>
-                  <Calendar markingType={'period'} markedDates={editModalMarkedDates} theme={{ calendarBackground: theme.card, dayTextColor: theme.text, monthTextColor: theme.text, todayTextColor: '#4A90E2' }} onDayPress={handleDayPressInEditModal} />
+                  <Calendar 
+                    key={`edit_${isDarkMode ? 'dark' : 'light'}_${monthFormat}`}
+                    monthFormat={monthFormat} 
+                    markingType={'period'} markedDates={editModalMarkedDates} enableSwipeMonths={true} theme={{ calendarBackground: theme.card, dayTextColor: theme.text, monthTextColor: theme.text, todayTextColor: '#4A90E2' }} onDayPress={handleDayPressInEditModal} />
                 </View>
 
+                {/* 입력 폼 섹션 */}
                 <View style={styles.inputSection}>
                   <Text style={[styles.inputLabel, { color: theme.subText }]}>할 일 내용</Text>
-                  <TextInput style={[styles.textInput, { backgroundColor: theme.card, color: theme.text, borderColor: theme.border }]} placeholder="수정할 내용을 입력하세요" placeholderTextColor={theme.subText} value={editTaskText} onChangeText={setEditTaskText} />
+                  <TextInput style={[styles.textInput, { backgroundColor: theme.card, color: theme.text, borderColor: theme.border, marginBottom: 20 }]} placeholder="수정할 내용을 입력하세요" placeholderTextColor={theme.subText} value={editTaskText} onChangeText={setEditTaskText} />
+
+                  {/* 수정용 색상 선택 드롭다운 */}
+                  <Text style={[styles.inputLabel, { color: theme.subText }]}>일정 색상</Text>
+                  <TouchableOpacity onPress={() => setIsEditColorDropdownOpen(!isEditColorDropdownOpen)} activeOpacity={0.7}>
+                    <View style={[styles.dropdownHeader, { backgroundColor: theme.card, borderColor: theme.border }, isEditColorDropdownOpen && styles.dropdownOpenRadius]}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        <View style={[styles.colorCircle, { backgroundColor: editTaskColor || '#E0E0E0' }]} />
+                        <Text style={{ color: theme.text, marginLeft: 10 }}>
+                          {editTaskColor ? COLOR_OPTIONS.find(c => c.value === editTaskColor)?.label : '자동 선택 (겹치지 않는 색)'}
+                        </Text>
+                      </View>
+                      <Ionicons name={isEditColorDropdownOpen ? "chevron-up" : "chevron-down"} size={20} color={theme.subText} />
+                    </View>
+                  </TouchableOpacity>
+                  
+                  {isEditColorDropdownOpen && (
+                    <View style={[styles.dropdownList, { backgroundColor: theme.card, borderColor: theme.border }]}>
+                      {COLOR_OPTIONS.map((option, idx) => {
+                        const isLast = idx === COLOR_OPTIONS.length - 1;
+                        return (
+                          <TouchableOpacity key={option.label} style={[styles.dropdownItem, isLast && { borderBottomWidth: 0 }]} onPress={() => { setEditTaskColor(option.value); setIsEditColorDropdownOpen(false); }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                              <View style={[styles.colorCircle, { backgroundColor: option.value || '#E0E0E0' }]} />
+                              <Text style={{ color: theme.text, marginLeft: 10 }}>{option.label}</Text>
+                            </View>
+                            {editTaskColor === option.value && <Ionicons name="checkmark" size={20} color="#4A90E2" />}
+                          </TouchableOpacity>
+                        )
+                      })}
+                    </View>
+                  )}
                 </View>
               </ScrollView>
             </KeyboardAvoidingView>
           </SafeAreaView>
         </Modal>
 
-        {/* --- 하단 서랍 메뉴 (BottomSheet) --- */}
+        {/* --- [하단 서랍 메뉴 (BottomSheet)] --- */}
         <Modal visible={isMenuVisible} transparent={true} animationType="none">
           <Animated.View style={[styles.menuOverlay, { opacity: overlayOpacity }]}><TouchableOpacity style={styles.overlayTouchArea} activeOpacity={1} onPress={handleCloseMenu} /></Animated.View>
           <Animated.View style={[styles.menuPanel, { backgroundColor: theme.card, transform: [{ translateY: panelTranslateY }] }]}>
@@ -658,7 +770,7 @@ export default function App() {
   );
 }
 
-// --- 6. 스타일 정의 ---
+// --- [스타일 정의] ---
 const styles = StyleSheet.create({
   container: { flex: 1 },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 15 },
@@ -715,6 +827,12 @@ const styles = StyleSheet.create({
   inputSection: { padding: 20 },
   inputLabel: { fontSize: 14, marginBottom: 10, fontWeight: '600' },
   textInput: { padding: 15, borderRadius: 12, fontSize: 16, borderWidth: 1 },
+
+  dropdownHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 15, borderRadius: 12, borderWidth: 1 },
+  dropdownOpenRadius: { borderBottomLeftRadius: 0, borderBottomRightRadius: 0 },
+  dropdownList: { borderBottomLeftRadius: 12, borderBottomRightRadius: 12, borderWidth: 1, borderTopWidth: 0, paddingHorizontal: 10, paddingBottom: 5 },
+  dropdownItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: 'rgba(120,120,128,0.2)' },
+  colorCircle: { width: 16, height: 16, borderRadius: 8 },
 
   menuOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0, 0, 0, 0.4)', zIndex: 10 },
   overlayTouchArea: { flex: 1 },
