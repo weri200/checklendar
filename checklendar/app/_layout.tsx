@@ -5,6 +5,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { useNotificationSetup } from '../useNotification';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { usePushNotifications } from '../usePushNotification';
 
 // 스플래시 화면 유지
 SplashScreen.preventAutoHideAsync();
@@ -18,6 +19,9 @@ const ThemeContext = createContext({
 export const useTheme = () => useContext(ThemeContext);
 
 export default function RootLayout() {
+
+  const expoPushToken = usePushNotifications();
+
   // 알림 설정 초기화
   useNotificationSetup();
 
