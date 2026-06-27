@@ -80,11 +80,13 @@ async function sendPushNotifications() {
   }
 }
 
-// 3. 자동 알림 스케줄러 (매 분 05초마다)
-cron.schedule('5 * * * * *', () => {
-  console.log('[스케줄러 작동] 정기 알림을 발송합니다.');
+// 3. 자동 알림 스케줄러 (Node.js 기본 내장 함수 사용)
+const ONE_MINUTE = 60 * 1000; // 60,000 밀리초 = 1분
+
+setInterval(() => {
+  console.log('[스케줄러 작동] 정기 알림 발송 프로세스를 시작합니다.');
   sendPushNotifications();
-});
+}, ONE_MINUTE);
 
 // 서버 시작
 app.listen(PORT, '0.0.0.0', () => {

@@ -80,7 +80,7 @@ async function registerForPushNotificationsAsync() {
       
           const registerTokenToServer = async (token: string) => {
     try {
-        const response = await fetch('http://192.168.219.113:3000/api/register-token', {
+        const response = await fetch('https://caution-compactor-property.ngrok-free.dev/api/register-token', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
