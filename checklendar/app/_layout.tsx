@@ -7,10 +7,10 @@ import { useNotificationSetup } from '../useNotification';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { usePushNotifications } from '../usePushNotification';
 
-// 스플래시 화면 유지
+// 앱 초기화가 완료될 때까지 스플래시 화면을 표시합니다.
 SplashScreen.preventAutoHideAsync();
 
-// 다크모드 Context
+// 앱 전역에서 사용하는 테마 상태를 제공합니다.
 const ThemeContext = createContext({
   isDarkMode: false,
   toggleDarkMode: () => {},
@@ -20,12 +20,12 @@ export const useTheme = () => useContext(ThemeContext);
 
 export default function RootLayout() {
 
-  const expoPushToken = usePushNotifications();
+  usePushNotifications();
 
-  // 알림 설정 초기화
+  // 앱 시작 시 알림 권한과 기본 설정을 초기화합니다.
   useNotificationSetup();
 
-  // 폰트 로드
+  // 아이콘 폰트를 로드합니다.
   const [fontsLoaded] = useFonts({
     ...Ionicons.font,
   });
@@ -36,10 +36,10 @@ export default function RootLayout() {
     }
   }, [fontsLoaded]);
   
-  // 테마 상태 관리
+  // 현재 테마 상태를 관리합니다.
   const [isDarkMode, setIsDarkMode] = useState(false);
 
-  // 저장된 테마 불러오기
+  // 저장된 테마 설정을 불러옵니다.
   useEffect(() => {
     const loadTheme = async () => {
       try {
@@ -54,7 +54,7 @@ export default function RootLayout() {
     loadTheme();
   }, []);
 
-  // 테마 토글 및 저장
+  // 테마를 전환하고 변경 사항을 저장합니다.
   const toggleDarkMode = useCallback(async () => {
     try {
       setIsDarkMode((prevTheme) => {
@@ -74,7 +74,7 @@ export default function RootLayout() {
     toggleDarkMode
   }), [isDarkMode, toggleDarkMode]);
 
-  // 로딩 대기
+  // 폰트 로드가 끝날 때까지 화면 렌더링을 지연합니다.
   if (!fontsLoaded) {
     return null;
   }

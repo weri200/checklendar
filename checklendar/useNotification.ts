@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
 import { useEffect } from 'react';
+import { formatLocalDate, parseLocalDate } from './utils/date';
 
 // ----------------------------------------------------------------------------
 // [1. 화면 켜짐 상태 알림 설정]
@@ -26,18 +27,18 @@ Notifications.setNotificationHandler({
 export const useNotificationSetup = () => {
   useEffect(() => {
     const requestPermission = async () => {
-      // 컴퓨터(시뮬레이터)가 아닌 진짜 스마트폰일 때만 권한을 묻습니다.
+      // 시뮬레이터에서는 권한 요청을 건너뜁니다.
       if (Device.isDevice) {
         const { status: existingStatus } = await Notifications.getPermissionsAsync();
         let finalStatus = existingStatus;
         
-        // 아직 대답을 안 했다면 팝업을 띄워 물어봅니다.
+        // 권한 상태가 결정되지 않았으면 사용자에게 권한을 요청합니다.
         if (existingStatus !== 'granted') {
           const { status } = await Notifications.requestPermissionsAsync();
           finalStatus = status;
         }
         
-        // 거절당했다면 아쉽지만 알림을 보낼 수 없다고 기록합니다.
+        // 권한이 없으면 이후 예약을 진행하지 않습니다.
         if (finalStatus !== 'granted') {
           console.log('알림 권한이 거부되었습니다.');
           return;
@@ -56,7 +57,7 @@ export const useNotificationSetup = () => {
 // ----------------------------------------------------------------------------
 export const updateNotification = async () => {
   try {
-    // 1. 기존 알림 싹 지우기
+    // 기존 예약을 취소한 뒤 최신 일정 데이터를 기준으로 다시 예약합니다.
     await Notifications.cancelAllScheduledNotificationsAsync();
 
     const savedEnabled = await AsyncStorage.getItem('notiEnabled');
@@ -70,12 +71,12 @@ export const updateNotification = async () => {
     const tasks = tasksStr ? JSON.parse(tasksStr) : {};
 
     const now = new Date();
-    const todayStr = new Date(now.getTime() - (now.getTimezoneOffset() * 60000)).toISOString().split('T')[0];
+    const todayStr = formatLocalDate(now);
 
-    // [수정 포인트 1] 미완료된 할 일이 1개라도 있는 날짜만 골라냅니다.
+    // 오늘 이후이며 미완료 일정이 하나 이상 있는 날짜만 선택합니다.
     const activeDates = Object.keys(tasks)
       .filter(date => {
-        // 해당 날짜의 할 일 중 완료되지 않은(isDone: false) 것만 필터링
+        // 해당 날짜의 미완료 일정만 계산합니다.
         const incompleteTasks = tasks[date].filter((t: any) => !t.isDone);
         return date >= todayStr && incompleteTasks.length > 0;
       })
@@ -84,16 +85,16 @@ export const updateNotification = async () => {
     const datesToSchedule = activeDates.slice(0, 30);
 
     for (const dateStr of datesToSchedule) {
-      const [year, month, day] = dateStr.split('-').map(Number);
-      const targetDate = new Date(year, month - 1, day, notiTime.getHours(), notiTime.getMinutes(), 0);
+      const targetDate = parseLocalDate(dateStr);
+      targetDate.setHours(notiTime.getHours(), notiTime.getMinutes(), 0, 0);
 
       if (targetDate <= now) continue;
 
-      // [수정 포인트 2] 알림 문구에 들어갈 개수도 '미완료 일정'만 셉니다.
+      // 알림 문구에는 미완료 일정의 개수만 포함합니다.
       const incompleteTasks = tasks[dateStr].filter((t: any) => !t.isDone);
       const taskCount = incompleteTasks.length;
 
-      // 만약 오늘 모든 할 일을 완료했다면 알림을 예약하지 않습니다.
+      // 일정이 모두 완료된 날짜에는 알림을 예약하지 않습니다.
       if (taskCount === 0) continue;
 
       await Notifications.scheduleNotificationAsync({

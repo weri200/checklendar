@@ -4,7 +4,7 @@ import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
 import Constants from 'expo-constants';
 
-// 1. 앱이 켜져 있을 때(포그라운드) 알림이 오면 어떻게 보여줄지 설정
+// 포그라운드에서 수신한 푸시 알림의 표시 방식을 설정합니다.
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowAlert: true,
@@ -18,33 +18,24 @@ Notifications.setNotificationHandler({
 export function usePushNotifications() {
   const [expoPushToken, setExpoPushToken] = useState('');
   
-  // 타입스크립트 에러 방지를 위해 초기값(null) 할당
+  // 수신 리스너를 보관해 언마운트 시 해제합니다.
   const notificationListener = useRef<Notifications.Subscription | null>(null);
-  const responseListener = useRef<Notifications.Subscription | null>(null);
 
   useEffect(() => {
-    // 권한 요청 및 토큰 발급 함수 실행
+    // 권한을 확인하고 Expo Push Token을 발급합니다.
     registerForPushNotificationsAsync().then(token => {
       if (token) setExpoPushToken(token);
     });
 
-    // 앱이 켜져 있을 때 알림이 도착한 경우의 이벤트 리스너
+    // 포그라운드 알림 수신을 관찰합니다.
     notificationListener.current = Notifications.addNotificationReceivedListener(notification => {
       console.log('알림 도착!', notification);
     });
 
-    // 사용자가 알림을 터치해서 앱에 들어왔을 때의 이벤트 리스너
-    responseListener.current = Notifications.addNotificationResponseReceivedListener(response => {
-      console.log('알림 클릭됨!', response);
-    });
-
-    // 컴포넌트가 언마운트될 때 리스너 정리 (최신 버전 .remove() 방식 적용)
+    // 컴포넌트가 사라질 때 리스너를 해제합니다.
     return () => {
       if (notificationListener.current) {
         notificationListener.current.remove();
-      }
-      if (responseListener.current) {
-        responseListener.current.remove();
       }
     };
   }, []);
@@ -52,7 +43,7 @@ export function usePushNotifications() {
   return expoPushToken;
 }
 
-// --- 토큰 발급 및 권한 요청 핵심 로직 ---
+// 플랫폼별 권한 확인, 토큰 발급, 서버 등록을 처리합니다.
 async function registerForPushNotificationsAsync() {
   let token;
 
@@ -98,7 +89,7 @@ async function registerForPushNotificationsAsync() {
     }
     };
 
-      // 개발 빌드 환경에서 안정적으로 토큰을 가져오기 위해 프로젝트 ID를 명시합니다.
+      // 개발 빌드에서도 토큰을 발급할 수 있도록 EAS 프로젝트 ID를 전달합니다.
       const projectId = Constants.expoConfig?.extra?.eas?.projectId ?? Constants.easConfig?.projectId;
       
       token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;

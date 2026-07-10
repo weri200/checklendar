@@ -1,13 +1,13 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Animated, KeyboardAvoidingView, Modal, Platform,
-  ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View, Switch
+  Animated, Modal, Platform,
+  ScrollView, StyleSheet, Text, TouchableOpacity, View, Switch
 } from 'react-native';
 
-// --- 외부 라이브러리 및 공통 모듈 ---
+// 화면에 필요한 외부 모듈을 불러옵니다.
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Stack, router, useFocusEffect } from 'expo-router';
+import { Stack, router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -17,7 +17,7 @@ import { useTheme } from './_layout';
 
 export default function SettingsScreen() {
 
-  // --- 상태 관리: 테마 및 일반 설정 ---
+  // 테마와 기본 설정 상태를 관리합니다.
   const { isDarkMode, toggleDarkMode } = useTheme(); 
   
   const [isNotiEnabled, setIsNotiEnabled] = useState(false); 
@@ -27,18 +27,18 @@ export default function SettingsScreen() {
 
   const [isChecklistView, setIsChecklistView] = useState(false);
 
-  // --- 상태 관리: 드롭다운 및 월 표시 포맷 ---
+  // 달력 월 표시 형식과 선택 메뉴 상태를 관리합니다.
   const [monthFormat, setMonthFormat] = useState('yyyy년 MM월');
   const [isDropdownOpen, setIsDropdownOpen] = useState(false); // 드롭다운 열림 여부 상태
   
-  // 다양한 월 표시 양식 리스트 추가
+  // 선택 가능한 월 표시 형식을 만듭니다.
   const FORMAT_OPTIONS = useMemo(() => {
     const now = new Date();
     const yyyy = now.getFullYear();
     const MM = String(now.getMonth() + 1).padStart(2, '0');
     const M = now.getMonth() + 1;
     
-    // React Native 환경에서 안전하게 영문 월 표시를 가져오기 위한 배열
+    // 플랫폼과 관계없이 사용할 영문 월 이름을 정의합니다.
     const monthNamesShort = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     const monthNamesLong = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
     const MMM = monthNamesShort[now.getMonth()];
@@ -55,7 +55,7 @@ export default function SettingsScreen() {
     ];
   }, []);
 
-  // --- 애니메이션 설정 ---
+  // 테마와 시간 선택 모달의 애니메이션 값을 초기화합니다.
   const themeAnim = useRef(new Animated.Value(isDarkMode ? 1 : 0)).current;
   const modalOpacity = useRef(new Animated.Value(0)).current;      
   const modalTranslateY = useRef(new Animated.Value(400)).current; 
@@ -68,7 +68,7 @@ export default function SettingsScreen() {
     subTextColor: themeAnim.interpolate({ inputRange: [0, 1], outputRange: ['#888888', '#AAAAAA'] })
   }), [themeAnim]);
 
-  // --- 설정 불러오기 ---
+  // 저장된 사용자 설정을 불러옵니다.
   const loadSettings = async () => {
     try {
       const savedEnabled = await AsyncStorage.getItem('notiEnabled');
@@ -97,13 +97,13 @@ export default function SettingsScreen() {
     loadSettings();
   }, []);
 
-  // --- 사용자 동작 핸들러 ---
+  // 사용자 설정 변경을 처리합니다.
   const handleToggleView = async (value: boolean) => {
     setIsChecklistView(value);
     await AsyncStorage.setItem('@main_view', value ? 'checklist' : 'calendar');
   };
 
-  // 드롭다운 포맷 선택 핸들러
+  // 선택한 월 표시 형식을 저장합니다.
   const handleSelectFormat = async (value: string) => {
     setMonthFormat(value);
     await AsyncStorage.setItem('@month_format', value);
@@ -164,7 +164,7 @@ export default function SettingsScreen() {
     updateNotification(); 
   };
 
-  // --- UI 렌더링 ---
+  // 설정 화면을 렌더링합니다.
   return (
     <Animated.View style={[styles.container, { backgroundColor: animatedColors.bgColor }]}>
       <StatusBar style={isDarkMode ? 'light' : 'dark'} />
@@ -191,7 +191,7 @@ export default function SettingsScreen() {
       <SafeAreaView edges={['bottom', 'left', 'right']} style={styles.content}>
         <ScrollView contentContainerStyle={{ paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
           
-          {/* 일반 설정 섹션 */}
+          {/* 일반 설정 섹션. */}
           <Animated.Text style={[styles.sectionTitle, { color: animatedColors.subTextColor }]}>일반 설정</Animated.Text>
           
           <Animated.View style={[styles.settingItem, { backgroundColor: animatedColors.itemBgColor, marginBottom: 10 }]}>
@@ -210,7 +210,7 @@ export default function SettingsScreen() {
             <Switch trackColor={{ false: "#767577", true: "#4A90E2" }} thumbColor={Platform.OS === 'ios' ? undefined : "#f4f3f4"} onValueChange={handleToggleView} value={isChecklistView} />
           </Animated.View>
 
-          {/* 월별 표시 설정 (드롭다운 방식) */}
+          {/* 월별 표시 설정 (드롭다운 방식). */}
           <View style={{ marginBottom: 10 }}>
             <TouchableOpacity onPress={() => setIsDropdownOpen(!isDropdownOpen)} activeOpacity={0.7}>
               <Animated.View style={[
@@ -231,7 +231,7 @@ export default function SettingsScreen() {
               </Animated.View>
             </TouchableOpacity>
 
-            {/* 드롭다운 항목 리스트 */}
+            {/* 드롭다운 항목 리스트. */}
             {isDropdownOpen && (
               <Animated.View style={[styles.dropdownContainer, { backgroundColor: animatedColors.itemBgColor }]}>
                 {FORMAT_OPTIONS.map((option, index) => {
@@ -259,7 +259,7 @@ export default function SettingsScreen() {
             )}
           </View>
 
-          {/* 알림 설정 섹션 */}
+          {/* 알림 설정 섹션. */}
           <Animated.Text style={[styles.sectionTitle, { color: animatedColors.subTextColor, marginTop: 30 }]}>알림 설정</Animated.Text>
           <Animated.View style={[styles.settingItem, { backgroundColor: animatedColors.itemBgColor, marginBottom: 10 }]}>
             <View style={styles.settingLabel}>
@@ -290,7 +290,7 @@ export default function SettingsScreen() {
         </ScrollView>
       </SafeAreaView>
 
-      {/* iOS용 시간 선택 모달 */}
+      {/* iOS용 시간 선택 모달. */}
       {Platform.OS === 'ios' && (
         <Modal visible={showPicker} transparent={true} animationType="none" onRequestClose={closePicker}>
           <Animated.View style={[styles.modalBackdropWrapper, { opacity: modalOpacity }]}>
@@ -310,7 +310,7 @@ export default function SettingsScreen() {
         </Modal>
       )}
 
-      {/* 안드로이드용 시간 선택 모달 */}
+      {/* 안드로이드용 시간 선택 모달. */}
       {Platform.OS === 'android' && showPicker && (
         <DateTimePicker value={notiTime} mode="time" display="default" onChange={handleAndroidTimeChange} />
       )}
@@ -319,19 +319,19 @@ export default function SettingsScreen() {
   );
 }
 
-// --- 스타일 설정 ---
+// 화면 스타일을 정의합니다.
 const styles = StyleSheet.create({
   container: { flex: 1 },
   content: { flex: 1, paddingHorizontal: 20, paddingTop: 10 },
   sectionTitle: { fontSize: 14, fontWeight: '600', marginBottom: 15, marginLeft: 5, textTransform: 'uppercase' },
   
-  // 기본 설정 항목 (버튼)
+  // 기본 설정 항목 스타일입니다.
   settingItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderRadius: 15, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2, elevation: 2 },
   settingLabel: { flexDirection: 'row', alignItems: 'center' },
   settingText: { fontSize: 16, fontWeight: '500', marginLeft: 12 },
   timeText: { fontSize: 16, fontWeight: '600' },
   
-  // 드롭다운 스타일 추가
+  // 월 표시 형식 선택 메뉴의 스타일입니다.
   dropdownOpenRadius: { borderBottomLeftRadius: 0, borderBottomRightRadius: 0 },
   dropdownContainer: { borderBottomLeftRadius: 15, borderBottomRightRadius: 15, paddingHorizontal: 16, paddingBottom: 8, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2, elevation: 2 },
   dropdownItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 14, paddingLeft: 34, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: 'rgba(120,120,128,0.2)' },
