@@ -13,9 +13,18 @@ import { Calendar } from 'react-native-calendars';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { GestureHandlerRootView, Swipeable } from 'react-native-gesture-handler';
 
+import {
+  addTask,
+  deleteTask,
+  findTaskById,
+  loadTasks,
+  saveTasks,
+  toggleTask,
+} from '../services/taskRepository';
+import type { Task, TaskState } from '../types/task';
 import { updateNotification } from '../useNotification';
 import { useTheme } from './_layout';
-import { formatLocalDate, parseLocalDate } from '../utils/date';
+import { formatLocalDate, getDateRange, parseLocalDate } from '../utils/date';
 
 // 앱을 처음 실행할 때 기본 화면 전환 여부를 관리합니다.
 let isAppJustLaunched = true;
@@ -45,19 +54,6 @@ const getTaskColor = (id: string) => {
   const num = parseInt(id.slice(-6), 10) || 0;
   return EVENT_PALETTE[num % EVENT_PALETTE.length];
 };
-
-// 일정 데이터의 타입을 정의합니다.
-interface Task {
-  id: string;              
-  text: string;            
-  range: [string, string]; // [시작일, 종료일]
-  isDone: boolean;         // 완료 여부
-  color?: string | null;   // 개별 지정 색상 추가
-}
-
-interface TaskState {
-  [key: string]: Task[];   // 날짜별 일정 목록
-}
 
 interface ThemeType {
   bg: string;              
@@ -197,8 +193,7 @@ export default function App() {
     useCallback(() => {
       const loadLatestTasks = async () => {
         try {
-          const savedTasks = await AsyncStorage.getItem('@checklendar_tasks');
-          if (savedTasks) setTasks(JSON.parse(savedTasks));
+          setTasks(await loadTasks());
         
           const savedMonthFormat = await AsyncStorage.getItem('@month_format');
           if (savedMonthFormat !== null) {
@@ -215,7 +210,7 @@ export default function App() {
   const updateAndSaveTasks = useCallback(async (newTasks: TaskState) => {
     setTasks(newTasks); 
     try {
-      await AsyncStorage.setItem('@checklendar_tasks', JSON.stringify(newTasks)); 
+      await saveTasks(newTasks);
       updateNotification(); 
     } catch (e) { 
       console.error(e); 
@@ -225,76 +220,43 @@ export default function App() {
   // [기능] 해당 날짜 범위에 사용되지 않은 빈 색상 찾기 로직
   const getAvailableColor = useCallback((currentTasks: TaskState, start: string, end: string) => {
     const usedColors = new Set<string>();
-    let curr = new Date(`${start}T00:00:00`); 
-    const last = new Date(`${end}T00:00:00`);
-    
-    // 선택된 범위 내의 모든 날짜를 순회하며 이미 쓰인 색상을 수집
-    while (curr <= last) {
-      const y = curr.getFullYear();
-      const m = String(curr.getMonth() + 1).padStart(2, '0');
-      const d = String(curr.getDate()).padStart(2, '0');
-      const dateStr = `${y}-${m}-${d}`;
-      
-      if (currentTasks[dateStr]) {
-        currentTasks[dateStr].forEach(t => {
-          usedColors.add(t.color || getTaskColor(t.id));
-        });
-      }
-      curr.setDate(curr.getDate() + 1);
-    }
-    
-    // 팔레트 색상 중 안 쓰인 색상 첫 번째 것을 반환
-    const available = EVENT_PALETTE.find(c => !usedColors.has(c));
+
+    getDateRange(start, end).forEach(date => {
+      currentTasks[date]?.forEach(task => {
+        usedColors.add(task.color || getTaskColor(task.id));
+      });
+    });
+
+    const available = EVENT_PALETTE.find(color => !usedColors.has(color));
     return available || EVENT_PALETTE[Math.floor(Math.random() * EVENT_PALETTE.length)];
   }, []);
 
   // 새 일정을 생성하고 저장합니다.
   const saveTask = useCallback(() => {
-    if (taskText.trim().length === 0) return; 
-    
-    const datesInRange = [];
-    let curr = new Date(`${addStartDate}T00:00:00`); 
-    const last = new Date(`${addEndDate}T00:00:00`);
-    
-    while (curr <= last) {
-      const y = curr.getFullYear();
-      const m = String(curr.getMonth() + 1).padStart(2, '0');
-      const d = String(curr.getDate()).padStart(2, '0');
-      datesInRange.push(`${y}-${m}-${d}`);
-      curr.setDate(curr.getDate() + 1);
-    }
+    if (taskText.trim().length === 0) return;
 
-    // 사용자가 색상을 고르지 않았다면 자동 할당
     const finalColor = taskColor || getAvailableColor(tasks, addStartDate, addEndDate);
-    const newTask: Task = { id: Date.now().toString(), text: taskText, range: [addStartDate, addEndDate], isDone: false, color: finalColor };
-    
-    const updatedTasks = { ...tasks };
-    datesInRange.forEach(date => {
-      updatedTasks[date] = [...(updatedTasks[date] || []), newTask];
-    });
+    const newTask: Task = {
+      id: Date.now().toString(),
+      text: taskText,
+      range: [addStartDate, addEndDate],
+      isDone: false,
+      color: finalColor,
+    };
 
-    updateAndSaveTasks(updatedTasks); 
-    setTaskText(''); 
-    setModalVisible(false); 
+    updateAndSaveTasks(addTask(tasks, newTask));
+    setTaskText('');
+    setModalVisible(false);
   }, [taskText, addStartDate, addEndDate, taskColor, tasks, updateAndSaveTasks, getAvailableColor]);
 
   // 일정의 완료 상태를 전환합니다.
   const toggleTaskCompletion = useCallback((taskId: string) => {
-    const updatedTasks = { ...tasks };
-    Object.keys(updatedTasks).forEach(date => {
-      updatedTasks[date] = updatedTasks[date].map(t => t.id === taskId ? { ...t, isDone: !t.isDone } : t);
-    });
-    updateAndSaveTasks(updatedTasks); 
+    updateAndSaveTasks(toggleTask(tasks, taskId));
   }, [tasks, updateAndSaveTasks]);
 
   // 모든 날짜에서 해당 일정을 삭제합니다.
   const deleteTaskPermanently = useCallback((taskId: string) => {
-    const updated = { ...tasks };
-    Object.keys(updated).forEach(date => {
-      updated[date] = updated[date].filter(t => t.id !== taskId);
-      if (updated[date].length === 0) delete updated[date];
-    });
-    updateAndSaveTasks(updated);
+    updateAndSaveTasks(deleteTask(tasks, taskId));
   }, [tasks, updateAndSaveTasks]);
 
   // [기능] 수정 모달 열기 및 기존 데이터 세팅
@@ -312,50 +274,19 @@ export default function App() {
   // 수정한 일정을 저장합니다.
   const saveEditedTask = useCallback(() => {
     if (!editingTaskId || editTaskText.trim().length === 0) return;
-    
-    let currentIsDone = false;
-    for (const date in tasks) {
-      const foundTask = tasks[date].find(t => t.id === editingTaskId);
-      if (foundTask) {
-        currentIsDone = foundTask.isDone;
-        break;
-      }
-    }
 
-    const updatedTasks = { ...tasks };
-
-    Object.keys(updatedTasks).forEach(date => {
-      updatedTasks[date] = updatedTasks[date].filter(t => t.id !== editingTaskId);
-      if (updatedTasks[date].length === 0) delete updatedTasks[date];
-    });
-
-    const datesInRange = [];
-    let curr = new Date(`${editStartDate}T00:00:00`); 
-    const last = new Date(`${editEndDate}T00:00:00`);
-    
-    while (curr <= last) {
-      const y = curr.getFullYear();
-      const m = String(curr.getMonth() + 1).padStart(2, '0');
-      const d = String(curr.getDate()).padStart(2, '0');
-      datesInRange.push(`${y}-${m}-${d}`);
-      curr.setDate(curr.getDate() + 1);
-    }
-
-    // 수정 시에도 색상이 비어있다면 자동 색상 탐색 적용
-    const finalColor = editTaskColor || getAvailableColor(updatedTasks, editStartDate, editEndDate);
-    const updatedTask: Task = { 
-      id: editingTaskId, 
-      text: editTaskText, 
-      range: [editStartDate, editEndDate], 
-      isDone: currentIsDone,
-      color: finalColor
+    const currentTask = findTaskById(tasks, editingTaskId);
+    const tasksWithoutEdited = deleteTask(tasks, editingTaskId);
+    const finalColor = editTaskColor || getAvailableColor(tasksWithoutEdited, editStartDate, editEndDate);
+    const updatedTask: Task = {
+      id: editingTaskId,
+      text: editTaskText,
+      range: [editStartDate, editEndDate],
+      isDone: currentTask?.isDone ?? false,
+      color: finalColor,
     };
 
-    datesInRange.forEach(date => {
-      updatedTasks[date] = [...(updatedTasks[date] || []), updatedTask];
-    });
-    
-    updateAndSaveTasks(updatedTasks);
+    updateAndSaveTasks(addTask(tasksWithoutEdited, updatedTask));
     setEditModalVisible(false);
     setEditingTaskId(null);
     setEditTaskText('');

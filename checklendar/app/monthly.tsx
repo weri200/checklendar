@@ -1,5 +1,4 @@
 import { Ionicons } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router, Stack, useFocusEffect } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -12,20 +11,18 @@ import { GestureHandlerRootView, Swipeable } from 'react-native-gesture-handler'
 import { Calendar } from 'react-native-calendars';
 
 import { useTheme } from './_layout';
+import {
+  addTask,
+  deleteTask,
+  findTaskById,
+  loadTasks,
+  saveTasks,
+  toggleTask,
+  updateTask,
+} from '../services/taskRepository';
+import type { Task, TaskState } from '../types/task';
 import { updateNotification } from '../useNotification';
 import { formatLocalDate } from '../utils/date'; 
-
-// 일정 데이터의 타입을 정의합니다.
-interface Task {
-  id: string;      
-  text: string;    
-  range: [string, string]; 
-  isDone: boolean; 
-}
-
-interface TaskState {
-  [key: string]: Task[]; 
-}
 
 interface ThemeType {
   bg: string;
@@ -140,15 +137,14 @@ export default function MonthlyScreen() {
   // 저장된 일정 데이터를 불러옵니다.
   useFocusEffect(
     useCallback(() => {
-      const loadTasks = async () => {
+      const loadLatestTasks = async () => {
         try {
-          const saved = await AsyncStorage.getItem('@checklendar_tasks');
-          if (saved) setTasks(JSON.parse(saved));
+          setTasks(await loadTasks());
         } catch (e) {
           console.error('데이터 불러오기 오류:', e);
         }
       };
-      loadTasks();
+      loadLatestTasks();
     }, [])
   );
 
@@ -156,7 +152,7 @@ export default function MonthlyScreen() {
   const updateAndSaveTasks = useCallback(async (newTasks: TaskState) => {
     setTasks(newTasks); 
     try {
-      await AsyncStorage.setItem('@checklendar_tasks', JSON.stringify(newTasks)); 
+      await saveTasks(newTasks);
       updateNotification(); 
     } catch (e) { 
       console.error('데이터 저장 오류:', e); 
@@ -164,47 +160,26 @@ export default function MonthlyScreen() {
   }, []);
 
   const toggleTaskCompletion = useCallback((taskId: string) => {
-    const updated = { ...tasks };
-    Object.keys(updated).forEach(date => {
-      updated[date] = updated[date].map(t => t.id === taskId ? { ...t, isDone: !t.isDone } : t);
-    });
-    updateAndSaveTasks(updated);
+    updateAndSaveTasks(toggleTask(tasks, taskId));
   }, [tasks, updateAndSaveTasks]);
 
   const deleteTaskPermanently = useCallback((taskId: string) => {
-    const updated = { ...tasks };
-    Object.keys(updated).forEach(date => {
-      updated[date] = updated[date].filter(t => t.id !== taskId);
-      if (updated[date].length === 0) delete updated[date];
-    });
-    updateAndSaveTasks(updated);
+    updateAndSaveTasks(deleteTask(tasks, taskId));
   }, [tasks, updateAndSaveTasks]);
 
   const saveTask = useCallback(() => {
-    if (taskText.trim().length === 0) return; 
-    
-    const datesInRange = [];
-    let curr = new Date(`${addStartDate}T00:00:00`); 
-    const last = new Date(`${addEndDate}T00:00:00`);
-    
-    while (curr <= last) {
-      const y = curr.getFullYear();
-      const m = String(curr.getMonth() + 1).padStart(2, '0');
-      const d = String(curr.getDate()).padStart(2, '0');
-      datesInRange.push(`${y}-${m}-${d}`);
-      curr.setDate(curr.getDate() + 1);
-    }
+    if (taskText.trim().length === 0) return;
 
-    const newTask: Task = { id: Date.now().toString(), text: taskText, range: [addStartDate, addEndDate], isDone: false };
-    const updatedTasks = { ...tasks };
-    
-    datesInRange.forEach(date => {
-      updatedTasks[date] = [...(updatedTasks[date] || []), newTask];
-    });
+    const newTask: Task = {
+      id: Date.now().toString(),
+      text: taskText,
+      range: [addStartDate, addEndDate],
+      isDone: false,
+    };
 
-    updateAndSaveTasks(updatedTasks); 
-    setTaskText(''); 
-    setModalVisible(false); 
+    updateAndSaveTasks(addTask(tasks, newTask));
+    setTaskText('');
+    setModalVisible(false);
   }, [taskText, addStartDate, addEndDate, tasks, updateAndSaveTasks]);
 
   const openEditModal = useCallback((id: string, currentText: string, currentRange: [string, string]) => {
@@ -218,47 +193,17 @@ export default function MonthlyScreen() {
 
   const saveEditedTask = useCallback(() => {
     if (!editingTaskId || editTaskText.trim().length === 0) return;
-    
-    let currentIsDone = false;
-    for (const date in tasks) {
-      const foundTask = tasks[date].find(t => t.id === editingTaskId);
-      if (foundTask) {
-        currentIsDone = foundTask.isDone;
-        break;
-      }
-    }
 
-    const updatedTasks = { ...tasks };
-
-    Object.keys(updatedTasks).forEach(date => {
-      updatedTasks[date] = updatedTasks[date].filter(t => t.id !== editingTaskId);
-      if (updatedTasks[date].length === 0) delete updatedTasks[date];
-    });
-
-    const datesInRange = [];
-    let curr = new Date(`${editStartDate}T00:00:00`); 
-    const last = new Date(`${editEndDate}T00:00:00`);
-    
-    while (curr <= last) {
-      const y = curr.getFullYear();
-      const m = String(curr.getMonth() + 1).padStart(2, '0');
-      const d = String(curr.getDate()).padStart(2, '0');
-      datesInRange.push(`${y}-${m}-${d}`);
-      curr.setDate(curr.getDate() + 1);
-    }
-
-    const updatedTask: Task = { 
-      id: editingTaskId, 
-      text: editTaskText, 
-      range: [editStartDate, editEndDate], 
-      isDone: currentIsDone 
+    const currentTask = findTaskById(tasks, editingTaskId);
+    const updatedTask: Task = {
+      id: editingTaskId,
+      text: editTaskText,
+      range: [editStartDate, editEndDate],
+      isDone: currentTask?.isDone ?? false,
+      color: currentTask?.color,
     };
 
-    datesInRange.forEach(date => {
-      updatedTasks[date] = [...(updatedTasks[date] || []), updatedTask];
-    });
-    
-    updateAndSaveTasks(updatedTasks);
+    updateAndSaveTasks(updateTask(tasks, updatedTask));
     setEditModalVisible(false);
     setEditingTaskId(null);
     setEditTaskText('');
