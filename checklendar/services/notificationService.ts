@@ -23,6 +23,7 @@ interface ServerNotification {
 let registrationQueue: Promise<boolean> = Promise.resolve(true);
 let scheduleSyncQueue: Promise<void> = Promise.resolve();
 
+// 모든 서버 요청에 공통 헤더와 제한 시간을 적용합니다.
 const requestJson = async (path: string, init: RequestInit): Promise<void> => {
   if (!PUSH_SERVER_URL) {
     throw new Error('EXPO_PUBLIC_PUSH_SERVER_URL이 설정되지 않았습니다.');
@@ -55,6 +56,7 @@ const requestJson = async (path: string, init: RequestInit): Promise<void> => {
   }
 };
 
+// 현재 서버에 등록을 마친 토큰만 로컬 저장소에서 복원합니다.
 const readRegisteredToken = async (): Promise<RegisteredToken | null> => {
   const savedToken = await AsyncStorage.getItem(REGISTERED_TOKEN_KEY);
   if (!savedToken) return null;
@@ -68,6 +70,7 @@ const readRegisteredToken = async (): Promise<RegisteredToken | null> => {
   }
 };
 
+// 동일한 서버와 토큰 조합은 다시 등록하지 않습니다.
 const performTokenRegistration = async (token: string): Promise<boolean> => {
   if (!PUSH_SERVER_URL) {
     console.warn('푸시 서버 주소가 없어 토큰 등록을 건너뜁니다.');
@@ -93,6 +96,7 @@ const performTokenRegistration = async (token: string): Promise<boolean> => {
   }
 };
 
+// 동시에 들어온 토큰 등록 요청을 순서대로 처리합니다.
 export const registerPushToken = (token: string): Promise<boolean> => {
   const runRegistration = () => performTokenRegistration(token).catch(error => {
     console.error('푸시 토큰 등록 처리 실패:', error);
@@ -102,6 +106,7 @@ export const registerPushToken = (token: string): Promise<boolean> => {
   return registrationQueue;
 };
 
+// 완료하지 않은 미래 일정만 서버에서 발송할 알림 형식으로 변환합니다.
 const buildServerNotifications = (tasks: TaskState, notificationTime: Date): ServerNotification[] => {
   const now = new Date();
   const today = formatLocalDate(now);
@@ -127,6 +132,7 @@ const buildServerNotifications = (tasks: TaskState, notificationTime: Date): Ser
     .slice(0, MAX_SCHEDULED_NOTIFICATIONS);
 };
 
+// 로컬 설정과 일정을 읽어 서버의 예약 목록 전체를 최신 상태로 맞춥니다.
 const performNotificationScheduleSync = async (): Promise<void> => {
   const registeredToken = await readRegisteredToken();
   if (!registeredToken) {
@@ -161,6 +167,7 @@ const performNotificationScheduleSync = async (): Promise<void> => {
   }
 };
 
+// 일정 동기화가 겹쳐도 서버에는 한 번에 하나씩 요청합니다.
 export const syncNotificationSchedule = (): Promise<void> => {
   const runSync = () => performNotificationScheduleSync().catch(error => {
     console.error('서버 알림 일정 처리 실패:', error);

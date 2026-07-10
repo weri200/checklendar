@@ -6,6 +6,7 @@ const cron = require('node-cron');
 const admin = require('firebase-admin');
 require('dotenv').config();
 
+// 배포 환경에서는 기본 자격 증명을, 로컬에서는 서비스 계정 파일을 사용합니다.
 const credential = process.env.GOOGLE_APPLICATION_CREDENTIALS
   ? admin.credential.applicationDefault()
   : admin.credential.cert(require('./firebase-service-account.json'));
@@ -26,14 +27,17 @@ const scheduleCollection = db.collection('scheduledNotifications');
 app.use(cors());
 app.use(express.json({ limit: '256kb' }));
 
+// 로그에 토큰 전체가 노출되지 않도록 앞뒤 일부만 남깁니다.
 const maskToken = token => `${token.slice(0, 18)}...${token.slice(-6)}`;
 
+// 기기 토큰과 클라이언트 알림 ID의 조합으로 항상 같은 문서 ID를 생성합니다.
 const createScheduleId = (token, notificationId) => {
   return crypto.createHash('sha256').update(`${token}:${notificationId}`).digest('hex');
 };
 
 const validateToken = token => typeof token === 'string' && Expo.isExpoPushToken(token);
 
+// 클라이언트의 예약 목록을 검증하고 서버에서 사용할 날짜 형식으로 변환합니다.
 const normalizeNotifications = notifications => {
   if (!Array.isArray(notifications) || notifications.length > MAX_NOTIFICATIONS_PER_DEVICE) {
     throw new Error(`notifications는 최대 ${MAX_NOTIFICATIONS_PER_DEVICE}개 배열이어야 합니다.`);
@@ -69,6 +73,7 @@ app.get('/health', (_req, res) => {
   res.json({ success: true });
 });
 
+// 앱 설치 단위의 Expo 푸시 토큰을 활성 상태로 등록합니다.
 app.post('/api/register-token', async (req, res) => {
   const { token } = req.body;
   if (!validateToken(token)) {
@@ -89,6 +94,7 @@ app.post('/api/register-token', async (req, res) => {
   }
 });
 
+// 한 기기의 기존 예약 목록을 클라이언트가 전달한 최신 목록으로 교체합니다.
 app.put('/api/notification-schedule', async (req, res) => {
   const { token, timezone, notifications } = req.body;
   if (!validateToken(token)) {
@@ -109,6 +115,7 @@ app.put('/api/notification-schedule', async (req, res) => {
     );
     const batch = db.batch();
 
+    // 새 목록에서 사라진 예약은 같은 배치에서 제거합니다.
     existingSnapshot.forEach(document => {
       if (!nextDocumentIds.has(document.id)) batch.delete(document.ref);
     });
@@ -141,6 +148,7 @@ app.put('/api/notification-schedule', async (req, res) => {
   }
 });
 
+// 트랜잭션으로 발송 권한을 선점해 여러 실행기가 같은 알림을 중복 발송하지 않게 합니다.
 const claimNotification = async document => {
   return db.runTransaction(async transaction => {
     const snapshot = await transaction.get(document.ref);
@@ -162,6 +170,7 @@ const claimNotification = async document => {
   });
 };
 
+// 더 이상 유효하지 않은 토큰은 후속 발송 대상에서 제외할 수 있도록 비활성화합니다.
 const markDeviceInactive = async token => {
   await tokenCollection.doc(token).set({
     active: false,
@@ -169,6 +178,7 @@ const markDeviceInactive = async token => {
   }, { merge: true });
 };
 
+// 발송 시간이 지난 예약을 선점한 뒤 Expo가 허용하는 크기로 나누어 전송합니다.
 const sendDueNotifications = async () => {
   const dueSnapshot = await scheduleCollection
     .where('scheduledAt', '<=', admin.firestore.Timestamp.now())
@@ -224,6 +234,7 @@ const sendDueNotifications = async () => {
   }
 };
 
+// 이전 작업이 끝나지 않았으면 이번 주기 실행을 건너뜁니다.
 let schedulerRunning = false;
 cron.schedule('* * * * *', async () => {
   if (schedulerRunning) return;

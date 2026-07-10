@@ -6,6 +6,7 @@ import { Platform } from 'react-native';
 
 import { registerPushToken, syncNotificationSchedule } from './services/notificationService';
 
+// 앱을 사용 중일 때 도착한 알림도 배너와 소리로 표시합니다.
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowAlert: true,
@@ -16,15 +17,18 @@ Notifications.setNotificationHandler({
   }),
 });
 
+// 여러 화면에서 훅을 호출해도 초기화는 한 번만 실행합니다.
 let initializationPromise: Promise<void> | null = null;
 
 const initializeNotifications = async () => {
+  // 웹과 푸시 토큰을 발급할 수 없는 환경에서는 초기화를 생략합니다.
   if (Platform.OS === 'web') return;
   if (!Device.isDevice && Platform.OS !== 'android') {
     console.log('푸시 알림은 실제 기기에서만 초기화합니다.');
     return;
   }
 
+  // Android 알림의 중요도와 기본 소리를 채널 단위로 설정합니다.
   if (Platform.OS === 'android') {
     await Notifications.setNotificationChannelAsync('default', {
       name: '기본 알림',
@@ -33,6 +37,7 @@ const initializeNotifications = async () => {
     });
   }
 
+  // 기존 권한을 우선 확인하고, 필요한 경우에만 사용자에게 권한을 요청합니다.
   const permission = await Notifications.getPermissionsAsync();
   const finalStatus = permission.status === 'granted'
     ? permission.status
@@ -50,6 +55,7 @@ const initializeNotifications = async () => {
   if (!projectId) throw new Error('EAS projectId가 설정되지 않았습니다.');
 
   const token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
+  // 토큰 등록에 성공한 경우에만 해당 기기의 예약 목록을 서버와 동기화합니다.
   if (await registerPushToken(token)) {
     await syncNotificationSchedule();
   }
@@ -68,6 +74,7 @@ export const useNotifications = () => {
       console.log('알림 도착:', notification.request.identifier);
     });
 
+    // 화면이 해제될 때 수신 이벤트 구독도 함께 정리합니다.
     return () => {
       receivedListener.current?.remove();
     };
