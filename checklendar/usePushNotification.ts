@@ -4,6 +4,8 @@ import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
 import Constants from 'expo-constants';
 
+import { registerPushToken } from './services/pushTokenRegistration';
+
 // 포그라운드에서 수신한 푸시 알림의 표시 방식을 설정합니다.
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -69,33 +71,13 @@ async function registerForPushNotificationsAsync() {
     try {
       console.log('⏳ 토큰 발급을 시도합니다...');
       
-          const registerTokenToServer = async (token: string) => {
-    try {
-        const response = await fetch('https://caution-compactor-property.ngrok-free.dev/api/register-token', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ token: token }),
-        });
-        
-        if (response.ok) {
-            console.log('서버에 토큰 등록 성공!');
-        } else {
-            console.error('서버 등록 응답 실패:', await response.text());
-        }
-    } catch (error) {
-        console.error('서버 등록 요청 중 오류 발생:', error);
-    }
-    };
-
       // 개발 빌드에서도 토큰을 발급할 수 있도록 EAS 프로젝트 ID를 전달합니다.
       const projectId = Constants.expoConfig?.extra?.eas?.projectId ?? Constants.easConfig?.projectId;
       
       token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
-      console.log('🎉 내 기기의 푸시 토큰:', token);
+      console.log('Expo Push Token 발급 완료');
 
-      await registerTokenToServer(token);
+      await registerPushToken(token);
     } catch (error) {
       console.error('❌ 토큰 발급 실패. 원인:', error);
     }
