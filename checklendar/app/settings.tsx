@@ -12,7 +12,7 @@ import { StatusBar } from 'expo-status-bar';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { updateNotification } from '../useNotification';
+import { requestNotificationUpdate } from '../services/notificationUpdateScheduler';
 import { useTheme } from './_layout';
 
 export default function SettingsScreen() {
@@ -139,7 +139,7 @@ export default function SettingsScreen() {
   const handleToggleNoti = async (value: boolean) => {
     setIsNotiEnabled(value);
     await AsyncStorage.setItem('notiEnabled', JSON.stringify(value));
-    updateNotification(); 
+    requestNotificationUpdate(); 
   };
 
   const handleAndroidTimeChange = async (event: any, selectedDate?: Date) => {
@@ -147,7 +147,7 @@ export default function SettingsScreen() {
     if (selectedDate) {
       setNotiTime(selectedDate);
       await AsyncStorage.setItem('notiTime', selectedDate.toISOString());
-      updateNotification(); 
+      requestNotificationUpdate(); 
     }
   };
 
@@ -161,7 +161,7 @@ export default function SettingsScreen() {
     setNotiTime(tempNotiTime);
     await AsyncStorage.setItem('notiTime', tempNotiTime.toISOString());
     closePicker();
-    updateNotification(); 
+    requestNotificationUpdate(); 
   };
 
   // 설정 화면을 렌더링합니다.

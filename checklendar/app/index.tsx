@@ -22,7 +22,7 @@ import {
   toggleTask,
 } from '../services/taskRepository';
 import type { Task, TaskState } from '../types/task';
-import { updateNotification } from '../useNotification';
+import { requestNotificationUpdate } from '../services/notificationUpdateScheduler';
 import { useTheme } from './_layout';
 import { formatLocalDate, getDateRange, parseLocalDate } from '../utils/date';
 
@@ -211,7 +211,7 @@ export default function App() {
     setTasks(newTasks); 
     try {
       await saveTasks(newTasks);
-      updateNotification(); 
+      requestNotificationUpdate(); 
     } catch (e) { 
       console.error(e); 
     }

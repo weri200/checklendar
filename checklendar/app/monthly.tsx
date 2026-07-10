@@ -21,7 +21,7 @@ import {
   updateTask,
 } from '../services/taskRepository';
 import type { Task, TaskState } from '../types/task';
-import { updateNotification } from '../useNotification';
+import { requestNotificationUpdate } from '../services/notificationUpdateScheduler';
 import { formatLocalDate } from '../utils/date'; 
 
 interface ThemeType {
@@ -153,7 +153,7 @@ export default function MonthlyScreen() {
     setTasks(newTasks); 
     try {
       await saveTasks(newTasks);
-      updateNotification(); 
+      requestNotificationUpdate(); 
     } catch (e) { 
       console.error('데이터 저장 오류:', e); 
     }
