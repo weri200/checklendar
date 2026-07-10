@@ -1,4 +1,4 @@
-import { updateNotification } from '../useNotification';
+import { syncNotificationSchedule } from './notificationService';
 
 const NOTIFICATION_UPDATE_DELAY_MS = 500;
 
@@ -6,7 +6,7 @@ let updateTimer: ReturnType<typeof setTimeout> | null = null;
 let updateQueue: Promise<void> = Promise.resolve();
 
 const enqueueNotificationUpdate = () => {
-  const runUpdate = () => updateNotification();
+  const runUpdate = () => syncNotificationSchedule();
   updateQueue = updateQueue.then(runUpdate, runUpdate);
 };
 

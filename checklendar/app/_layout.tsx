@@ -3,9 +3,8 @@ import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import { useNotificationSetup } from '../useNotification';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { usePushNotifications } from '../usePushNotification';
+import { useNotifications } from '../useNotifications';
 
 // 앱 초기화가 완료될 때까지 스플래시 화면을 표시합니다.
 SplashScreen.preventAutoHideAsync();
@@ -19,11 +18,8 @@ const ThemeContext = createContext({
 export const useTheme = () => useContext(ThemeContext);
 
 export default function RootLayout() {
-
-  usePushNotifications();
-
-  // 앱 시작 시 알림 권한과 기본 설정을 초기화합니다.
-  useNotificationSetup();
+  // 앱 시작 시 알림 권한, 토큰, 서버 일정을 한 번만 초기화합니다.
+  useNotifications();
 
   // 아이콘 폰트를 로드합니다.
   const [fontsLoaded] = useFonts({
