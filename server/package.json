@@ -4,18 +4,21 @@
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
-    "check": "node --check index.js"
+    "check": "node --check index.js && node --check notificationTaskManager.js && node --check holidayService.js",
+    "test": "node --test notificationTaskManager.test.js holidayService.test.js"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "description": "",
   "dependencies": {
+    "@google-cloud/tasks": "^6.2.3",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
     "expo-server-sdk": "^6.1.0",
     "express": "^5.2.1",
     "firebase-admin": "^13.10.0",
+    "luxon": "^3.7.2",
     "node-cron": "^4.5.0"
   }
 }

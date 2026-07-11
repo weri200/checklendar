@@ -13,7 +13,14 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { requestNotificationUpdate } from '../services/notificationUpdateScheduler';
+import {
+  DEFAULT_HOLIDAY_CACHE_RETENTION_YEARS,
+  HOLIDAY_CACHE_RETENTION_KEY,
+  pruneHolidayCache,
+} from '../services/holidayService';
 import { useTheme } from './_layout';
+
+const HOLIDAY_CACHE_OPTIONS = [1, 3, 5, 10];
 
 export default function SettingsScreen() {
 
@@ -30,6 +37,8 @@ export default function SettingsScreen() {
   // 달력 월 표시 형식과 선택 메뉴 상태를 관리합니다.
   const [monthFormat, setMonthFormat] = useState('yyyy년 MM월');
   const [isDropdownOpen, setIsDropdownOpen] = useState(false); // 드롭다운 열림 여부 상태
+  const [holidayCacheYears, setHolidayCacheYears] = useState(DEFAULT_HOLIDAY_CACHE_RETENTION_YEARS);
+  const [isHolidayCacheDropdownOpen, setIsHolidayCacheDropdownOpen] = useState(false);
   
   // 선택 가능한 월 표시 형식을 만듭니다.
   const FORMAT_OPTIONS = useMemo(() => {
@@ -75,11 +84,20 @@ export default function SettingsScreen() {
       const savedTime = await AsyncStorage.getItem('notiTime');
       const savedView = await AsyncStorage.getItem('@main_view');
       const savedMonthFormat = await AsyncStorage.getItem('@month_format');
+      const savedHolidayCacheYears = await AsyncStorage.getItem(HOLIDAY_CACHE_RETENTION_KEY);
       
       if (savedEnabled !== null) setIsNotiEnabled(JSON.parse(savedEnabled));
       if (savedTime !== null) setNotiTime(new Date(savedTime));
       if (savedView !== null) setIsChecklistView(savedView === 'checklist');
       if (savedMonthFormat !== null) setMonthFormat(savedMonthFormat);
+      const retentionYears = savedHolidayCacheYears === null
+        ? DEFAULT_HOLIDAY_CACHE_RETENTION_YEARS
+        : Number(savedHolidayCacheYears);
+      const validRetentionYears = HOLIDAY_CACHE_OPTIONS.includes(retentionYears)
+        ? retentionYears
+        : DEFAULT_HOLIDAY_CACHE_RETENTION_YEARS;
+      setHolidayCacheYears(validRetentionYears);
+      await pruneHolidayCache(validRetentionYears);
     } catch (e) {
       console.log('설정 불러오기 실패:', e);
     }
@@ -108,6 +126,14 @@ export default function SettingsScreen() {
     setMonthFormat(value);
     await AsyncStorage.setItem('@month_format', value);
     setIsDropdownOpen(false); // 선택 후 드롭다운 닫기
+  };
+
+  // 보관 기간을 저장한 즉시 범위를 벗어난 과거 공휴일 캐시를 정리합니다.
+  const handleSelectHolidayCacheYears = async (years: number) => {
+    setHolidayCacheYears(years);
+    setIsHolidayCacheDropdownOpen(false);
+    await AsyncStorage.setItem(HOLIDAY_CACHE_RETENTION_KEY, String(years));
+    await pruneHolidayCache(years);
   };
 
   const handleOpenPicker = () => { 
@@ -259,6 +285,63 @@ export default function SettingsScreen() {
             )}
           </View>
 
+          {/* 공휴일 캐시 보관 기간 설정. */}
+          <View style={{ marginBottom: 10 }}>
+            <TouchableOpacity
+              onPress={() => setIsHolidayCacheDropdownOpen(!isHolidayCacheDropdownOpen)}
+              activeOpacity={0.7}
+            >
+              <Animated.View style={[
+                styles.settingItem,
+                { backgroundColor: animatedColors.itemBgColor },
+                isHolidayCacheDropdownOpen && styles.dropdownOpenRadius,
+              ]}>
+                <View style={styles.settingLabel}>
+                  <Ionicons name="archive-outline" size={22} color={isDarkMode ? "#FFD700" : "#4A90E2"} />
+                  <Animated.Text style={[styles.settingText, { color: animatedColors.textColor }]}>
+                    공휴일 캐시 보관
+                  </Animated.Text>
+                </View>
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <Animated.Text style={[styles.timeText, { color: animatedColors.subTextColor, marginRight: 8 }]}>
+                    과거 {holidayCacheYears}년
+                  </Animated.Text>
+                  <Ionicons
+                    name={isHolidayCacheDropdownOpen ? "chevron-up" : "chevron-down"}
+                    size={20}
+                    color={isDarkMode ? "#AAAAAA" : "#888888"}
+                  />
+                </View>
+              </Animated.View>
+            </TouchableOpacity>
+
+            {isHolidayCacheDropdownOpen && (
+              <Animated.View style={[styles.dropdownContainer, { backgroundColor: animatedColors.itemBgColor }]}>
+                {HOLIDAY_CACHE_OPTIONS.map((years, index) => {
+                  const isLast = index === HOLIDAY_CACHE_OPTIONS.length - 1;
+                  const isSelected = holidayCacheYears === years;
+                  return (
+                    <TouchableOpacity
+                      key={years}
+                      style={[styles.dropdownItem, isLast && styles.dropdownItemLast]}
+                      onPress={() => handleSelectHolidayCacheYears(years)}
+                      activeOpacity={0.7}
+                    >
+                      <Animated.Text style={[
+                        styles.dropdownText,
+                        { color: isSelected ? '#4A90E2' : animatedColors.textColor },
+                        isSelected && { fontWeight: 'bold' },
+                      ]}>
+                        현재 연도부터 과거 {years}년
+                      </Animated.Text>
+                      {isSelected && <Ionicons name="checkmark" size={20} color="#4A90E2" />}
+                    </TouchableOpacity>
+                  );
+                })}
+              </Animated.View>
+            )}
+          </View>
+
           {/* 알림 설정 섹션. */}
           <Animated.Text style={[styles.sectionTitle, { color: animatedColors.subTextColor, marginTop: 30 }]}>알림 설정</Animated.Text>
           <Animated.View style={[styles.settingItem, { backgroundColor: animatedColors.itemBgColor, marginBottom: 10 }]}>
@@ -284,7 +367,7 @@ export default function SettingsScreen() {
           )}
 
           <Animated.Text style={[styles.guideText, { color: animatedColors.subTextColor }]}>
-            * 시작 화면 설정을 켜면 앱 실행 시 월별 체크리스트가 먼저 보입니다.
+            * 공휴일 캐시 기간을 줄이면 범위를 벗어난 과거 데이터가 즉시 삭제됩니다.
           </Animated.Text>
 
         </ScrollView>

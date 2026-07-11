@@ -23,6 +23,7 @@ import {
 } from '../services/taskRepository';
 import type { Task, TaskState } from '../types/task';
 import { requestNotificationUpdate } from '../services/notificationUpdateScheduler';
+import { loadHolidays, type Holiday } from '../services/holidayService';
 import { useTheme } from './_layout';
 import { formatLocalDate, getDateRange, parseLocalDate } from '../utils/date';
 
@@ -151,6 +152,8 @@ export default function App() {
   const [tasks, setTasks] = useState<TaskState>({});                       
   const [viewDate, setViewDate] = useState(formatLocalDate()); 
   const [monthFormat, setMonthFormat] = useState('yyyy년 MM월');
+  const [calendarYear, setCalendarYear] = useState(Number(viewDate.slice(0, 4)));
+  const [holidays, setHolidays] = useState<Record<string, Holiday>>({});
 
   // [상태 관리] UI 모달 표시 여부
   const [isModalVisible, setModalVisible] = useState(false);               
@@ -206,6 +209,21 @@ export default function App() {
       loadLatestTasks();
     }, [])
   );
+
+  // 표시 중인 연도가 바뀔 때만 서버에서 공휴일을 조회합니다.
+  useEffect(() => {
+    let active = true;
+    loadHolidays(calendarYear)
+      .then(items => {
+        if (!active) return;
+        setHolidays(current => ({
+          ...current,
+          ...Object.fromEntries(items.map(holiday => [holiday.date, holiday])),
+        }));
+      })
+      .catch(error => console.warn('공휴일 불러오기 실패:', error));
+    return () => { active = false; };
+  }, [calendarYear]);
 
   const updateAndSaveTasks = useCallback(async (newTasks: TaskState) => {
     setTasks(newTasks); 
@@ -421,6 +439,7 @@ export default function App() {
               markingType={'custom'}
               markedDates={mainMarkedDates}
               onDayPress={(day: any) => setViewDate(day.dateString)}
+              onMonthChange={(month: any) => setCalendarYear(month.year)}
               enableSwipeMonths={true}
               monthFormat={monthFormat}
               theme={{ 
@@ -447,6 +466,7 @@ export default function App() {
                 });
 
                 const isSunday = parseLocalDate(date.dateString).getDay() === 0;
+                const holiday = holidays[date.dateString];
                 const isSelected = date.dateString === viewDate;
                 const isToday = date.dateString === formatLocalDate();
 
@@ -462,16 +482,20 @@ export default function App() {
                   >
                     <View style={[styles.dayNumberWrapper, isToday && styles.todayCircle]}>
                       <Text style={[
-                        styles.dayText, 
-                        isSunday && { color: '#FF5252' }, 
-                        { color: (isToday || isSelected) ? '#FFF' : theme.text },
-                        state === 'disabled' && { color: theme.subText } 
+                        styles.dayText,
+                        { color: theme.text },
+                        (isSunday || holiday) && { color: '#FF5252' },
+                        (isToday || isSelected) && { color: '#FFF' },
+                        state === 'disabled' && { color: theme.subText }
                       ]}>
                         {date.day}
                       </Text>
                     </View>
 
                     <View style={styles.eventListWrapper}>
+                      {holiday && (
+                        <Text style={styles.holidayText} numberOfLines={1}>{holiday.name}</Text>
+                      )}
                       {dayTasks.slice(0, 3).map((task) => {
                         const isMultiDay = task.range[0] !== task.range[1];
                         // 저장된 색상이 있으면 우선 사용하고 없으면 ID 기반 사용
@@ -722,6 +746,7 @@ const styles = StyleSheet.create({
   dayText: { fontSize: 12, fontWeight: '500' },
 
   eventListWrapper: { marginTop: 1, width: '100%' },
+  holidayText: { color: '#FF5252', fontSize: 8, fontWeight: '600', paddingHorizontal: 1 },
   eventBar: { width: '105%', height: 14, marginVertical: 1, paddingHorizontal: 4, justifyContent: 'center' },
   eventBarText: { fontSize: 9, color: '#FFF', fontWeight: 'bold' },
 
