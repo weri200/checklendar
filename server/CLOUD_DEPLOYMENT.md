@@ -44,9 +44,7 @@ gcloud run deploy checklendar-api \
   --source ./server \
   --region=asia-northeast3 \
   --allow-unauthenticated \
-  --min=0 \
   --min-instances=0 \
-  --max=3 \
   --max-instances=3 \
   --service-account=checklendar-server@PROJECT_ID.iam.gserviceaccount.com \
   --set-env-vars=CLOUD_TASKS_PROJECT_ID=PROJECT_ID,CLOUD_TASKS_LOCATION=asia-northeast3,CLOUD_TASKS_QUEUE=checklendar-notifications,NOTIFICATION_TIMEZONE=Asia/Seoul,FIREBASE_ANDROID_APP_ID=FIREBASE_APP_ID,APP_CHECK_ENFORCEMENT=enforce

@@ -60,6 +60,12 @@ const validateToken = token => (
   && token.length <= 1500
   && /^[A-Za-z0-9_:-]+$/.test(token)
 );
+// FCM 전환 전 저장된 Expo 토큰도 본인 기기의 이전 예약 정리에만 허용합니다.
+const validateLegacyExpoToken = token => (
+  typeof token === 'string'
+  && token.length <= 1500
+  && /^(?:ExponentPushToken|ExpoPushToken)\[[A-Za-z0-9_-]+\]$/.test(token)
+);
 
 // 클라이언트의 예약 목록을 검증하고 서버에서 사용할 날짜 형식으로 변환합니다.
 const normalizeNotifications = notifications => {
@@ -125,7 +131,7 @@ app.post('/api/register-token', mutationRateLimit, async (req, res) => {
     if (
       typeof previousToken === 'string'
       && previousToken !== token
-      && validateToken(previousToken)
+      && (validateToken(previousToken) || validateLegacyExpoToken(previousToken))
     ) {
       await markDeviceInactive(previousToken);
     }
