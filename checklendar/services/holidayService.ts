@@ -1,5 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+import { getAppCheckToken } from './appCheckService';
+
 const API_SERVER_URL = (process.env.EXPO_PUBLIC_API_SERVER_URL
   || process.env.EXPO_PUBLIC_PUSH_SERVER_URL)?.trim().replace(/\/+$/, '');
 const REQUEST_TIMEOUT_MS = 10_000;
@@ -87,7 +89,9 @@ export const loadHolidays = async (year: number): Promise<Holiday[]> => {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
   try {
+    const appCheckToken = await getAppCheckToken();
     const response = await fetch(`${API_SERVER_URL}/api/holidays?year=${year}`, {
+      headers: { 'X-Firebase-AppCheck': appCheckToken },
       signal: controller.signal,
     });
     if (!response.ok) throw new Error(`공휴일 서버 요청 실패 (${response.status})`);

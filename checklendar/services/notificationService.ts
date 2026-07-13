@@ -2,8 +2,10 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import type { TaskState } from '../types/task';
 import { formatLocalDate, parseLocalDate } from '../utils/date';
+import { getAppCheckToken } from './appCheckService';
 
 const PUSH_SERVER_URL = process.env.EXPO_PUBLIC_PUSH_SERVER_URL?.trim().replace(/\/+$/, '');
+// 기존 키를 유지해 Expo 토큰을 새 FCM 토큰으로 교체할 때 서버 예약도 함께 정리합니다.
 const REGISTERED_TOKEN_KEY = '@checklendar_registered_push_token';
 const REQUEST_TIMEOUT_MS = 10_000;
 const MAX_SCHEDULED_NOTIFICATIONS = 30;
@@ -33,10 +35,12 @@ const requestJson = async (path: string, init: RequestInit): Promise<void> => {
   const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
   try {
+    const appCheckToken = await getAppCheckToken();
     const response = await fetch(`${PUSH_SERVER_URL}${path}`, {
       ...init,
       headers: {
         'Content-Type': 'application/json',
+        'X-Firebase-AppCheck': appCheckToken,
         ...init.headers,
       },
       signal: controller.signal,
@@ -77,18 +81,22 @@ const performTokenRegistration = async (token: string): Promise<boolean> => {
     return false;
   }
 
-  const registeredToken = await readRegisteredToken();
-  if (registeredToken?.token === token) {
+  const previousRegistration = await readRegisteredToken();
+  if (previousRegistration?.token === token) {
     return true;
   }
 
   try {
     await requestJson('/api/register-token', {
       method: 'POST',
-      body: JSON.stringify({ token }),
+      body: JSON.stringify({
+        token,
+        platform: 'android',
+        previousToken: previousRegistration?.token,
+      }),
     });
     await AsyncStorage.setItem(REGISTERED_TOKEN_KEY, JSON.stringify({ serverUrl: PUSH_SERVER_URL, token }));
-    console.log('서버에 푸시 토큰 등록 성공!');
+    console.log('서버에 FCM 토큰 등록 성공!');
     return true;
   } catch (error) {
     console.error('푸시 토큰 등록 실패:', error);

@@ -1,4 +1,3 @@
-import Constants from 'expo-constants';
 import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
 import { useEffect, useRef } from 'react';
@@ -9,7 +8,6 @@ import { registerPushToken, syncNotificationSchedule } from './services/notifica
 // 앱을 사용 중일 때 도착한 알림도 배너와 소리로 표시합니다.
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
-    shouldShowAlert: true,
     shouldPlaySound: true,
     shouldSetBadge: false,
     shouldShowBanner: true,
@@ -21,9 +19,12 @@ Notifications.setNotificationHandler({
 let initializationPromise: Promise<void> | null = null;
 
 const initializeNotifications = async () => {
-  // 웹과 푸시 토큰을 발급할 수 없는 환경에서는 초기화를 생략합니다.
-  if (Platform.OS === 'web') return;
-  if (!Device.isDevice && Platform.OS !== 'android') {
+  // 현재 서버는 Android FCM 토큰을 직접 사용합니다.
+  if (Platform.OS !== 'android') {
+    console.log('FCM 직접 알림은 현재 Android에서만 초기화합니다.');
+    return;
+  }
+  if (!Device.isDevice) {
     console.log('푸시 알림은 실제 기기에서만 초기화합니다.');
     return;
   }
@@ -51,10 +52,12 @@ const initializeNotifications = async () => {
   // 기존 로컬 예약을 제거해 서버 푸시와 중복되지 않도록 합니다.
   await Notifications.cancelAllScheduledNotificationsAsync();
 
-  const projectId = Constants.expoConfig?.extra?.eas?.projectId ?? Constants.easConfig?.projectId;
-  if (!projectId) throw new Error('EAS projectId가 설정되지 않았습니다.');
+  const devicePushToken = await Notifications.getDevicePushTokenAsync();
+  if (devicePushToken.type !== 'android' || typeof devicePushToken.data !== 'string') {
+    throw new Error(`Android FCM 토큰을 가져오지 못했습니다: ${devicePushToken.type}`);
+  }
 
-  const token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
+  const token = devicePushToken.data;
   // 토큰 등록에 성공한 경우에만 해당 기기의 예약 목록을 서버와 동기화합니다.
   if (await registerPushToken(token)) {
     await syncNotificationSchedule();
