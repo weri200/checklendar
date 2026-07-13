@@ -13,15 +13,14 @@ const ENV_KEYS = [
   'NOTIFICATION_TIMEZONE',
 ];
 
-const createManager = () => createNotificationTaskManager({
+const createManager = (overrides = {}) => createNotificationTaskManager({
   admin: {},
-  db: {},
-  expo: {},
+  messaging: {},
   scheduleCollection: {},
-  receiptCollection: {},
   tokenCollection: {},
   claimNotification: async () => null,
   markDeviceInactive: async () => {},
+  ...overrides,
 });
 
 test('Cloud Tasks 설정이 없으면 당일 예약 작업을 만들지 않습니다.', async t => {
@@ -94,4 +93,94 @@ test('오늘 발송할 예약을 지정된 시각의 Cloud Task로 생성합니�
     Number(requests[0].task.scheduleTime.seconds),
     Math.floor(scheduledAt.getTime() / 1000),
   );
+});
+
+test('예약 시각에 Android FCM 메시지를 직접 발송하고 예약을 삭제합니다.', async t => {
+  const previous = Object.fromEntries(ENV_KEYS.map(key => [key, process.env[key]]));
+  Object.assign(process.env, {
+    CLOUD_TASKS_PROJECT_ID: 'test-project',
+    CLOUD_TASKS_LOCATION: 'asia-northeast3',
+    CLOUD_TASKS_QUEUE: 'test-queue',
+    CLOUD_RUN_SERVICE_URL: 'https://example.run.app',
+    INTERNAL_API_SECRET: 'test-secret',
+    NOTIFICATION_TIMEZONE: 'UTC',
+  });
+  t.after(() => {
+    ENV_KEYS.forEach(key => {
+      if (previous[key] === undefined) delete process.env[key];
+      else process.env[key] = previous[key];
+    });
+  });
+
+  let deleted = false;
+  let sentMessage = null;
+  const scheduleDocument = {
+    get: async () => ({
+      exists: true,
+      data: () => ({
+        token: 'fcm-device-token-for-test',
+        notificationId: '2026-07-13',
+        version: 'version-1',
+        title: '일정 알림',
+        body: '할 일이 1개 있습니다.',
+        status: 'pending',
+      }),
+    }),
+    delete: async () => { deleted = true; },
+  };
+  const routes = new Map();
+  const manager = createManager({
+    messaging: {
+      send: async message => {
+        sentMessage = message;
+        return 'projects/test-project/messages/message-1';
+      },
+    },
+    scheduleCollection: { doc: () => scheduleDocument },
+    tokenCollection: {
+      doc: () => ({
+        get: async () => ({ exists: true, data: () => ({ active: true }) }),
+      }),
+    },
+    claimNotification: async () => ({
+      ref: scheduleDocument,
+      token: 'fcm-device-token-for-test',
+      notificationId: '2026-07-13',
+      title: '일정 알림',
+      body: '할 일이 1개 있습니다.',
+    }),
+  });
+  manager.registerRoutes({
+    post: (path, ...handlers) => routes.set(path, handlers),
+  });
+
+  const [verify, send] = routes.get('/internal/send-notification');
+  const request = {
+    get: name => name === 'x-internal-secret' ? 'test-secret' : '',
+    body: { scheduleId: 'schedule-1', version: 'version-1' },
+  };
+  let responseBody = null;
+  const response = {
+    status: () => response,
+    json: body => { responseBody = body; return body; },
+  };
+  await new Promise((resolve, reject) => {
+    verify(request, response, () => send(request, response).then(resolve, reject));
+  });
+
+  assert.equal(responseBody.success, true);
+  assert.equal(responseBody.sent, true);
+  assert.equal(deleted, true);
+  assert.deepEqual(sentMessage, {
+    token: 'fcm-device-token-for-test',
+    notification: {
+      title: '일정 알림',
+      body: '할 일이 1개 있습니다.',
+    },
+    data: { notificationId: '2026-07-13' },
+    android: {
+      priority: 'high',
+      notification: { channelId: 'default', sound: 'default' },
+    },
+  });
 });

@@ -6,7 +6,9 @@
 - Cloud Tasks는 각 알림 시각에 Cloud Run을 호출합니다.
 - 당일 일정 등록 및 변경은 일정 동기화 직후 새로운 Cloud Task를 만듭니다.
 - 삭제되거나 변경된 이전 작업은 실행 시 문서 버전을 확인하고 발송을 건너뜁니다.
-- Expo 영수증 확인도 발송 15분 후 Cloud Task로 실행됩니다.
+- Cloud Run은 Firebase Admin SDK를 사용해 FCM으로 직접 발송합니다.
+- 공개 `/api` 경로는 Firebase App Check 토큰과 서버 요청 제한으로 보호합니다.
+- Cloud Run 인스턴스와 Cloud Tasks 처리량을 제한해 비정상 트래픽의 비용 상한을 낮춥니다.
 
 ## API 활성화
 
@@ -15,6 +17,8 @@ gcloud services enable \
   run.googleapis.com \
   cloudscheduler.googleapis.com \
   cloudtasks.googleapis.com \
+  firebaseappcheck.googleapis.com \
+  fcm.googleapis.com \
   cloudbuild.googleapis.com \
   artifactregistry.googleapis.com
 ```
@@ -24,8 +28,11 @@ gcloud services enable \
 ```bash
 gcloud tasks queues create checklendar-notifications \
   --location=asia-northeast3 \
-  --max-dispatches-per-second=100 \
-  --max-concurrent-dispatches=20
+  --max-dispatches-per-second=5 \
+  --max-concurrent-dispatches=2 \
+  --max-attempts=5 \
+  --min-backoff=5s \
+  --max-backoff=300s
 ```
 
 ## Cloud Run 배포
@@ -37,10 +44,12 @@ gcloud run deploy checklendar-api \
   --source ./server \
   --region=asia-northeast3 \
   --allow-unauthenticated \
+  --min=0 \
   --min-instances=0 \
-  --max-instances=2 \
+  --max=3 \
+  --max-instances=3 \
   --service-account=checklendar-server@PROJECT_ID.iam.gserviceaccount.com \
-  --set-env-vars=CLOUD_TASKS_PROJECT_ID=PROJECT_ID,CLOUD_TASKS_LOCATION=asia-northeast3,CLOUD_TASKS_QUEUE=checklendar-notifications,NOTIFICATION_TIMEZONE=Asia/Seoul
+  --set-env-vars=CLOUD_TASKS_PROJECT_ID=PROJECT_ID,CLOUD_TASKS_LOCATION=asia-northeast3,CLOUD_TASKS_QUEUE=checklendar-notifications,NOTIFICATION_TIMEZONE=Asia/Seoul,FIREBASE_ANDROID_APP_ID=FIREBASE_APP_ID,APP_CHECK_ENFORCEMENT=enforce
 ```
 
 배포 후 생성된 URL을 확인하고 Cloud Tasks용 환경변수를 추가합니다.
@@ -55,7 +64,7 @@ gcloud run services update checklendar-api \
   --update-env-vars=CLOUD_RUN_SERVICE_URL=$CLOUD_RUN_URL,INTERNAL_API_SECRET=LONG_RANDOM_SECRET
 ```
 
-Cloud Run 서비스 계정에는 Firestore 사용 권한과 Cloud Tasks 생성 권한이 필요합니다.
+Cloud Run 서비스 계정에는 Firestore 사용, Cloud Tasks 생성, FCM 발송 권한이 필요합니다.
 
 ```bash
 gcloud projects add-iam-policy-binding PROJECT_ID \
@@ -65,7 +74,17 @@ gcloud projects add-iam-policy-binding PROJECT_ID \
 gcloud projects add-iam-policy-binding PROJECT_ID \
   --member=serviceAccount:checklendar-server@PROJECT_ID.iam.gserviceaccount.com \
   --role=roles/cloudtasks.enqueuer
+
+gcloud projects add-iam-policy-binding PROJECT_ID \
+  --member=serviceAccount:checklendar-server@PROJECT_ID.iam.gserviceaccount.com \
+  --role=roles/firebasecloudmessaging.admin
+
+gcloud projects add-iam-policy-binding PROJECT_ID \
+  --member=serviceAccount:checklendar-server@PROJECT_ID.iam.gserviceaccount.com \
+  --role=roles/firebaseappcheck.tokenVerifier
 ```
+
+Firebase Console의 App Check에서 Android 앱을 Play Integrity 공급자로 등록하고 릴리스 서명 인증서의 SHA-256을 추가합니다. 개발 APK는 별도의 디버그 토큰을 등록해 사용하며, 실제 토큰은 `.env.local`에만 저장합니다. 기존 앱에서 점진적으로 전환할 때는 `APP_CHECK_ENFORCEMENT=monitor`로 검증 로그를 확인한 다음 `enforce`로 바꿉니다.
 
 ## 자정 Scheduler 생성
 
