@@ -2,6 +2,10 @@
 
 Checklendar의 React Native·Expo 클라이언트입니다. 프로젝트 전체 설명과 서버·클라우드 구성은 [저장소 루트 README](../README.md)를 참고하세요.
 
+## 클라우드 사용량
+
+[Cloudscope Personal](https://checklendar-e5327.web.app)에서 Google Cloud와 Firebase의 서비스별 사용량, 무료 한도 사용률 및 활성화된 API를 확인할 수 있습니다. 실제 프로젝트 데이터는 승인된 Google 계정으로 로그인해야 조회할 수 있습니다.
+
 ## 실행
 
 ```bash
