@@ -253,7 +253,6 @@ https://checklendar-api-1045415573044.asia-northeast3.run.app
 
 ## 다음 작업
 
-- 공공데이터포털 공휴일 API 인증키 401 오류 수정
 - FCM·Cloud Tasks 사용량과 실패 로그 모니터링
 - iOS 알림을 지원할 경우 APNs 또는 Firebase iOS 구성을 추가
 - 미사용 Google Cloud 프로젝트 검토 후 정리

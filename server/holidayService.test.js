@@ -1,6 +1,19 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { parseHolidayXml } = require('./holidayService');
+const { normalizeServiceKey, parseHolidayXml } = require('./holidayService');
+
+test('Encoding 및 Decoding 인증키를 동일한 원본 키로 정규화한다', () => {
+  const decodedKey = 'sample+service/key=';
+  const encodedKey = encodeURIComponent(decodedKey);
+
+  assert.equal(normalizeServiceKey(decodedKey), decodedKey);
+  assert.equal(normalizeServiceKey(encodedKey), decodedKey);
+  assert.equal(normalizeServiceKey(`  ${encodedKey}\n`), decodedKey);
+});
+
+test('손상된 Encoding 인증키는 설정 오류로 처리한다', () => {
+  assert.throws(() => normalizeServiceKey('broken%2Fkey%ZZ'), /인코딩 형식/);
+});
 
 test('공휴일 XML을 날짜와 이름 배열로 변환한다', () => {
   const xml = `
