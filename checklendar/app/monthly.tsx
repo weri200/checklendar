@@ -41,13 +41,13 @@ const MonthlyTaskItem = ({ item, theme, onToggle, onDelete, onEdit }: {
   theme: ThemeType; 
   onToggle: (id: string) => void; 
   onDelete: (id: string) => void;
-  onEdit: (id: string, currentText: string, currentRange: [string, string]) => void; 
+  onEdit: (id: string, currentText: string, currentRange: [string, string], currentMemo?: string) => void;
 }) => {
   const swipeableRef = useRef<Swipeable>(null);
 
   const handleEdit = () => {
     swipeableRef.current?.close();
-    onEdit(item.id, item.text, item.range);
+    onEdit(item.id, item.text, item.range, item.memo);
   };
 
   const renderRightActions = () => (
@@ -84,6 +84,11 @@ const MonthlyTaskItem = ({ item, theme, onToggle, onDelete, onEdit }: {
             >
               {item.text}
             </Text>
+            {item.memo ? (
+              <Text style={[styles.taskMemo, { color: theme.subText }]} numberOfLines={2}>
+                {item.memo}
+              </Text>
+            ) : null}
             <Text style={[styles.taskRange, { color: theme.subText }]}>
               {item.range[0] === item.range[1] ? item.range[0] : `${item.range[0]} ~ ${item.range[1]}`}
             </Text>
@@ -113,10 +118,12 @@ export default function MonthlyScreen() {
   const [addStartDate, setAddStartDate] = useState(today);
   const [addEndDate, setAddEndDate] = useState(today);
   const [taskText, setTaskText] = useState('');
+  const [taskMemo, setTaskMemo] = useState('');
 
   const [isEditModalVisible, setEditModalVisible] = useState(false);
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [editTaskText, setEditTaskText] = useState('');
+  const [editTaskMemo, setEditTaskMemo] = useState('');
   const [editStartDate, setEditStartDate] = useState(today);
   const [editEndDate, setEditEndDate] = useState(today);
   const [isEditSelecting, setIsEditSelecting] = useState(false);
@@ -172,19 +179,22 @@ export default function MonthlyScreen() {
 
     const newTask: Task = {
       id: Date.now().toString(),
-      text: taskText,
+      text: taskText.trim(),
+      memo: taskMemo.trim() || undefined,
       range: [addStartDate, addEndDate],
       isDone: false,
     };
 
     updateAndSaveTasks(addTask(tasks, newTask));
     setTaskText('');
+    setTaskMemo('');
     setModalVisible(false);
-  }, [taskText, addStartDate, addEndDate, tasks, updateAndSaveTasks]);
+  }, [taskText, taskMemo, addStartDate, addEndDate, tasks, updateAndSaveTasks]);
 
-  const openEditModal = useCallback((id: string, currentText: string, currentRange: [string, string]) => {
+  const openEditModal = useCallback((id: string, currentText: string, currentRange: [string, string], currentMemo?: string) => {
     setEditingTaskId(id);
     setEditTaskText(currentText);
+    setEditTaskMemo(currentMemo || '');
     setEditStartDate(currentRange[0]);
     setEditEndDate(currentRange[1]);
     setIsEditSelecting(false);
@@ -197,7 +207,8 @@ export default function MonthlyScreen() {
     const currentTask = findTaskById(tasks, editingTaskId);
     const updatedTask: Task = {
       id: editingTaskId,
-      text: editTaskText,
+      text: editTaskText.trim(),
+      memo: editTaskMemo.trim() || undefined,
       range: [editStartDate, editEndDate],
       isDone: currentTask?.isDone ?? false,
       color: currentTask?.color,
@@ -207,7 +218,8 @@ export default function MonthlyScreen() {
     setEditModalVisible(false);
     setEditingTaskId(null);
     setEditTaskText('');
-  }, [editingTaskId, editTaskText, editStartDate, editEndDate, tasks, updateAndSaveTasks]);
+    setEditTaskMemo('');
+  }, [editingTaskId, editTaskText, editTaskMemo, editStartDate, editEndDate, tasks, updateAndSaveTasks]);
 
   // 모달과 하단 메뉴의 표시 상태를 제어합니다.
   const handleOpenMenu = useCallback(() => setMenuVisible(true), []);
@@ -303,6 +315,7 @@ export default function MonthlyScreen() {
     setAddStartDate(today); 
     setAddEndDate(today); 
     setTaskText(''); 
+    setTaskMemo('');
     setModalVisible(true);
   }, [today]);
 
@@ -407,6 +420,17 @@ export default function MonthlyScreen() {
                 <View style={styles.inputSection}>
                   <Text style={[styles.inputLabel, { color: theme.subText }]}>할 일 내용</Text>
                   <TextInput style={[styles.textInput, { backgroundColor: theme.card, color: theme.text, borderColor: theme.border }]} placeholder="어떤 일정이 있나요?" placeholderTextColor={theme.subText} value={taskText} onChangeText={setTaskText} />
+
+                  <Text style={[styles.inputLabel, styles.memoLabel, { color: theme.subText }]}>메모 (선택)</Text>
+                  <TextInput
+                    style={[styles.textInput, styles.memoInput, { backgroundColor: theme.card, color: theme.text, borderColor: theme.border }]}
+                    placeholder="간단한 메모를 남겨보세요"
+                    placeholderTextColor={theme.subText}
+                    value={taskMemo}
+                    onChangeText={setTaskMemo}
+                    multiline
+                    maxLength={200}
+                  />
                 </View>
 
               </ScrollView>
@@ -438,6 +462,17 @@ export default function MonthlyScreen() {
                 <View style={styles.inputSection}>
                   <Text style={[styles.inputLabel, { color: theme.subText }]}>할 일 내용</Text>
                   <TextInput style={[styles.textInput, { backgroundColor: theme.card, color: theme.text, borderColor: theme.border }]} placeholder="수정할 내용을 입력하세요" placeholderTextColor={theme.subText} value={editTaskText} onChangeText={setEditTaskText} />
+
+                  <Text style={[styles.inputLabel, styles.memoLabel, { color: theme.subText }]}>메모 (선택)</Text>
+                  <TextInput
+                    style={[styles.textInput, styles.memoInput, { backgroundColor: theme.card, color: theme.text, borderColor: theme.border }]}
+                    placeholder="간단한 메모를 남겨보세요"
+                    placeholderTextColor={theme.subText}
+                    value={editTaskMemo}
+                    onChangeText={setEditTaskMemo}
+                    multiline
+                    maxLength={200}
+                  />
                 </View>
 
               </ScrollView>
@@ -491,6 +526,7 @@ const styles = StyleSheet.create({
   taskCard: { borderRadius: 15, padding: 16, marginBottom: 12, borderWidth: 1, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 3, elevation: 1 },
   taskContent: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   taskText: { fontSize: 16, fontWeight: '600' },
+  taskMemo: { fontSize: 12, lineHeight: 17, marginTop: 4 },
   taskRange: { fontSize: 12, marginTop: 4 },
   
   actionContainer: { flexDirection: 'row', marginBottom: 12, marginLeft: 10 },
@@ -516,6 +552,8 @@ const styles = StyleSheet.create({
   inputSection: { padding: 20 },
   inputLabel: { fontSize: 14, marginBottom: 10, fontWeight: '600' },
   textInput: { padding: 15, borderRadius: 12, fontSize: 16, borderWidth: 1 },
+  memoLabel: { marginTop: 18 },
+  memoInput: { minHeight: 82, textAlignVertical: 'top' },
 
   menuOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0, 0, 0, 0.4)', zIndex: 10 },
   overlayTouchArea: { flex: 1 },
