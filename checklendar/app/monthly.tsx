@@ -33,7 +33,7 @@ interface ThemeType {
   icon: string;
 }
 
-const PANEL_HEIGHT = 300; 
+const MENU_PANEL_OFFSET = 300;
 
 // 월별 목록에 표시할 일정 항목입니다.
 const MonthlyTaskItem = ({ item, theme, onToggle, onDelete, onEdit }: { 
@@ -130,7 +130,8 @@ export default function MonthlyScreen() {
 
   // 테마와 메뉴 애니메이션 값을 초기화합니다.
   const overlayOpacity = useRef(new Animated.Value(0)).current;            
-  const panelTranslateY = useRef(new Animated.Value(PANEL_HEIGHT)).current;
+  const panelBottom = useRef(new Animated.Value(-MENU_PANEL_OFFSET)).current;
+  const isMenuClosing = useRef(false);
 
   const theme = useMemo(() => ({
     bg: isDarkMode ? '#121212' : '#F8F9FA',
@@ -222,22 +223,41 @@ export default function MonthlyScreen() {
   }, [editingTaskId, editTaskText, editTaskMemo, editStartDate, editEndDate, tasks, updateAndSaveTasks]);
 
   // 모달과 하단 메뉴의 표시 상태를 제어합니다.
-  const handleOpenMenu = useCallback(() => setMenuVisible(true), []);
-  const handleCloseMenu = useCallback(() => {
+  const handleOpenMenu = useCallback(() => {
+    isMenuClosing.current = false;
+    overlayOpacity.stopAnimation();
+    panelBottom.stopAnimation();
+    overlayOpacity.setValue(0);
+    panelBottom.setValue(-MENU_PANEL_OFFSET);
+    setMenuVisible(true);
+  }, [overlayOpacity, panelBottom]);
+
+  const closeMenu = useCallback((onClosed?: () => void) => {
+    if (isMenuClosing.current) return;
+    isMenuClosing.current = true;
+
     Animated.parallel([
       Animated.timing(overlayOpacity, { toValue: 0, duration: 200, useNativeDriver: true }),
-      Animated.timing(panelTranslateY, { toValue: PANEL_HEIGHT, duration: 250, useNativeDriver: true }),
-    ]).start(() => setMenuVisible(false));
-  }, [overlayOpacity, panelTranslateY]);
+      Animated.timing(panelBottom, { toValue: -MENU_PANEL_OFFSET, duration: 180, useNativeDriver: false }),
+    ]).start(({ finished }) => {
+      isMenuClosing.current = false;
+      if (!finished) return;
+      setMenuVisible(false);
+      onClosed?.();
+    });
+  }, [overlayOpacity, panelBottom]);
+
+  const handleCloseMenu = useCallback(() => closeMenu(), [closeMenu]);
+  const handleMenuAction = useCallback((action: () => void) => closeMenu(action), [closeMenu]);
 
   useEffect(() => {
     if (isMenuVisible) {
       Animated.parallel([
         Animated.timing(overlayOpacity, { toValue: 1, duration: 300, useNativeDriver: true }),
-        Animated.spring(panelTranslateY, { toValue: 0, speed: 12, bounciness: 5, useNativeDriver: true }),
+        Animated.timing(panelBottom, { toValue: 0, duration: 120, useNativeDriver: false }),
       ]).start();
     }
-  }, [isMenuVisible, overlayOpacity, panelTranslateY]);
+  }, [isMenuVisible, overlayOpacity, panelBottom]);
 
   const handleDayPressInModal = useCallback((day: any) => {
     const clickedDate = day.dateString;
@@ -481,9 +501,9 @@ export default function MonthlyScreen() {
         </Modal>
 
         {/* 바텀 메뉴. */}
-        <Modal visible={isMenuVisible} transparent={true} animationType="none">
+        <Modal visible={isMenuVisible} transparent={true} animationType="none" onRequestClose={handleCloseMenu}>
           <Animated.View style={[styles.menuOverlay, { opacity: overlayOpacity }]}><TouchableOpacity style={styles.overlayTouchArea} activeOpacity={1} onPress={handleCloseMenu} /></Animated.View>
-          <Animated.View style={[styles.menuPanel, { backgroundColor: theme.card, transform: [{ translateY: panelTranslateY }] }]}>
+          <Animated.View style={[styles.menuPanel, { backgroundColor: theme.card, bottom: panelBottom }]}>
             <View style={styles.handleBar} />
             <SafeAreaView edges={['bottom']} style={styles.menuSafeArea}>
               <View style={styles.menuHeader}>
@@ -493,17 +513,17 @@ export default function MonthlyScreen() {
                 </TouchableOpacity>
               </View>
               
-              <TouchableOpacity style={styles.menuItem} onPress={() => { handleCloseMenu(); router.push('/'); }}>
+              <TouchableOpacity style={styles.menuItem} onPress={() => handleMenuAction(() => router.push('/'))}>
                 <Ionicons name="calendar-outline" size={22} color={theme.subText} />
                 <Text style={[styles.menuItemText, { color: theme.text }]}>캘린더로 보기</Text>
               </TouchableOpacity>
 
-              <TouchableOpacity style={styles.menuItem} onPress={() => { handleCloseMenu(); router.push('/settings'); }}>
+              <TouchableOpacity style={styles.menuItem} onPress={() => handleMenuAction(() => router.push('/settings'))}>
                 <Ionicons name="settings-outline" size={22} color={theme.subText} />
                 <Text style={[styles.menuItemText, { color: theme.text }]}>설정</Text>
               </TouchableOpacity>
 
-              <TouchableOpacity style={styles.menuItem} onPress={() => { handleCloseMenu(); updateAndSaveTasks({}); }}>
+              <TouchableOpacity style={styles.menuItem} onPress={() => handleMenuAction(() => updateAndSaveTasks({}))}>
                 <Ionicons name="trash-outline" size={22} color="#FF5252" />
                 <Text style={[styles.menuItemText, { color: '#FF5252' }]}>모든 일정 지우기</Text>
               </TouchableOpacity>
@@ -557,7 +577,7 @@ const styles = StyleSheet.create({
 
   menuOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0, 0, 0, 0.4)', zIndex: 10 },
   overlayTouchArea: { flex: 1 },
-  menuPanel: { position: 'absolute', bottom: 0, width: '100%', borderTopLeftRadius: 30, borderTopRightRadius: 30, paddingTop: 12, zIndex: 20 },
+  menuPanel: { position: 'absolute', width: '100%', borderTopLeftRadius: 30, borderTopRightRadius: 30, paddingTop: 12, zIndex: 20 },
   handleBar: { width: 40, height: 5, backgroundColor: '#E0E0E0', borderRadius: 3, alignSelf: 'center', marginBottom: 10 },
   menuSafeArea: { paddingHorizontal: 25, paddingBottom: 20 },
   menuHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 15 },
