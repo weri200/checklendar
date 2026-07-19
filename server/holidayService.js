@@ -3,6 +3,21 @@ const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const REQUEST_TIMEOUT_MS = 10_000;
 const holidayCache = new Map();
 
+// 공공데이터포털은 Encoding/Decoding 인증키를 모두 표시합니다. Secret에 어느 쪽을
+// 저장해도 요청 단계에서는 원본 키 한 번만 URL 인코딩되도록 정규화합니다.
+const normalizeServiceKey = serviceKey => {
+  const trimmedKey = serviceKey.trim();
+  if (!trimmedKey) return '';
+
+  try {
+    return /%[0-9a-f]{2}/i.test(trimmedKey)
+      ? decodeURIComponent(trimmedKey)
+      : trimmedKey;
+  } catch {
+    throw new Error('공휴일 API 인증키의 URL 인코딩 형식이 올바르지 않습니다.');
+  }
+};
+
 // XML 응답에 포함된 기본 엔티티를 화면에 표시할 문자열로 복원합니다.
 const decodeXml = value => value
   .replace(/&lt;/g, '<')
@@ -40,10 +55,14 @@ const parseHolidayXml = xml => {
 const fetchHolidays = async (year, serviceKey) => {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
-  const query = `serviceKey=${encodeURIComponent(serviceKey)}&solYear=${year}&numOfRows=100&pageNo=1`;
+  const url = new URL(HOLIDAY_API_URL);
+  url.searchParams.set('serviceKey', normalizeServiceKey(serviceKey));
+  url.searchParams.set('solYear', String(year));
+  url.searchParams.set('numOfRows', '100');
+  url.searchParams.set('pageNo', '1');
 
   try {
-    const response = await fetch(`${HOLIDAY_API_URL}?${query}`, { signal: controller.signal });
+    const response = await fetch(url, { signal: controller.signal });
     if (!response.ok) throw new Error(`공휴일 API HTTP 오류: ${response.status}`);
     return parseHolidayXml(await response.text());
   } finally {
@@ -80,4 +99,4 @@ const registerHolidayRoutes = app => {
   });
 };
 
-module.exports = { parseHolidayXml, registerHolidayRoutes };
+module.exports = { normalizeServiceKey, parseHolidayXml, registerHolidayRoutes };

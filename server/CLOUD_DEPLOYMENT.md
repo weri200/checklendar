@@ -59,8 +59,14 @@ CLOUD_RUN_URL=$(gcloud run services describe checklendar-api \
 
 gcloud run services update checklendar-api \
   --region=asia-northeast3 \
-  --update-env-vars=CLOUD_RUN_SERVICE_URL=$CLOUD_RUN_URL,INTERNAL_API_SECRET=LONG_RANDOM_SECRET
+  --update-env-vars=CLOUD_RUN_SERVICE_URL=$CLOUD_RUN_URL,INTERNAL_API_SECRET=LONG_RANDOM_SECRET \
+  --update-secrets=PUBLIC_DATA_SERVICE_KEY=public-data-service-key:latest
 ```
+
+`public-data-service-key`에는 공공데이터포털의 일반 인증키(Decoding)를 저장하는 것을
+권장합니다. 서버는 Encoding 인증키도 한 번 디코딩한 뒤 요청하므로 두 형식을 모두
+지원합니다. Secret 값을 갱신한 경우 새 버전을 만든 뒤 Cloud Run에 새 Revision을
+배포해야 `latest` 값이 반영됩니다.
 
 Cloud Run 서비스 계정에는 Firestore 사용, Cloud Tasks 생성, FCM 발송 권한이 필요합니다.
 
