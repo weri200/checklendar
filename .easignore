@@ -1,0 +1,44 @@
+# dependencies and generated output
+node_modules/
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+.kotlin/
+**/.cxx/
+**/.gradle/
+**/build/
+*.orig.*
+*.tsbuildinfo
+
+# Repository metadata and non-mobile services
+.git/
+.codex/
+.agents/
+/server/
+
+# Local credentials and environment
+*.jks
+*.keystore
+credentials.json
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.pem
+.env
+.env*.local
+firebase-service-account.json
+google-services.json
+checklendar/android/local.properties
+
+# Logs and editor files
+.metro-health-check*
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+.DS_Store
+
+# Firebase client configuration is required by the native Android build.
+!checklendar/google-services.json
+!checklendar/android/app/google-services.json

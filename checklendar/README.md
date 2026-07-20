@@ -34,3 +34,9 @@ EXPO_PUBLIC_PUSH_SERVER_URL=https://your-cloud-run-service.run.app
 npm run lint
 npx tsc --noEmit
 ```
+
+## Play 배포 준비
+
+- 개인정보처리방침: [`../PRIVACY_POLICY.md`](../PRIVACY_POLICY.md)
+- 데이터 보안 작성안: [`../PLAY_DATA_SAFETY.md`](../PLAY_DATA_SAFETY.md)
+- App Check 및 내부 테스트 체크리스트: [`../PLAY_RELEASE_CHECKLIST.md`](../PLAY_RELEASE_CHECKLIST.md)

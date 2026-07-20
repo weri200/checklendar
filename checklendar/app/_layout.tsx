@@ -80,6 +80,7 @@ export default function RootLayout() {
       <Stack screenOptions={{ headerShown: false }} initialRouteName='index'>
         <Stack.Screen name="index" />
         <Stack.Screen name="settings" />
+        <Stack.Screen name="privacy" />
         <Stack.Screen name="monthly" />
       </Stack>
     </ThemeContext.Provider>

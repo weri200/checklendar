@@ -11,7 +11,7 @@ Checklendar는 달력과 체크리스트를 결합한 일정 관리 앱입니다
 | 공휴일 | 구현 완료 | 한국천문연구원 특일 정보 API 연동, 달력 빨간 날짜 표시 |
 | 공휴일 캐시 | 구현 완료 | 현재·미래 연도 30일 캐시, 과거 캐시 보관 기간 설정 |
 | 푸시 토큰·예약 동기화 | 구현 완료 | Android FCM 토큰 등록 및 Firestore 예약 동기화 |
-| 푸시 발송 | 구현 완료 | Firebase Admin SDK 직접 발송 및 만료 토큰 비활성화 |
+| 푸시 발송 | 구현 완료 | Firebase Admin SDK 직접 발송 및 만료 토큰·예약 삭제 |
 | Cloud Run | 배포 완료 | 서울 리전, 최소 인스턴스 0 |
 | Cloud Tasks | 생성 완료 | 알림 예약 발송용 큐 생성 |
 | Cloud Scheduler | 연결 완료 | 매일 자정 당일 알림 준비 작업 실행 및 강제 실행 검증 완료 |
@@ -27,7 +27,7 @@ Checklendar는 달력과 체크리스트를 결합한 일정 관리 앱입니다
 - 대한민국 공휴일 날짜와 명칭 표시
 - 공휴일 데이터의 오프라인 캐시와 과거 캐시 보관 기간 설정
 - 사용자 지정 시각의 일정 요약 푸시 알림
-- 만료된 FCM 토큰 비활성화와 남은 예약 삭제
+- 알림 해제 또는 만료 시 FCM 토큰과 남은 예약 삭제
 - Cloud Run 서비스 ID를 이용한 키 없는 FCM 서버 인증
 
 ## 시스템 구성
@@ -206,6 +206,7 @@ npm test
 | `GET` | `/health` | 서버 상태 확인 |
 | `GET` | `/api/holidays?year=YYYY` | 연도별 공휴일 조회 |
 | `POST` | `/api/register-token` | Android FCM 토큰 등록 |
+| `DELETE` | `/api/register-token` | Android FCM 토큰과 예약 삭제 |
 | `PUT` | `/api/notification-schedule` | 기기별 알림 예약 전체 동기화 |
 | `POST` | `/internal/prepare-daily-notifications` | 당일 알림 Task 준비 |
 | `POST` | `/internal/send-notification` | 예약 알림 발송 |
