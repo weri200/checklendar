@@ -1,7 +1,7 @@
 {
   "cli": {
     "version": ">= 18.5.0",
-    "appVersionSource": "remote"
+    "appVersionSource": "local"
   },
   "build": {
     "development": {
@@ -15,8 +15,7 @@
       "android": {
         "buildType": "app-bundle"
       },
-      "credentialsSource": "remote",
-      "autoIncrement": true
+      "credentialsSource": "remote"
     }
   },
   "submit": {

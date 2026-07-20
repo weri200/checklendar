@@ -7,6 +7,7 @@ const { createNotificationTaskManager } = require('./notificationTaskManager');
 const { registerHolidayRoutes } = require('./holidayService');
 const { createAppCheckMiddleware } = require('./appCheckMiddleware');
 const { createRateLimiter } = require('./rateLimitMiddleware');
+const { createDeviceRegistrationManager } = require('./deviceRegistration');
 require('dotenv').config();
 
 // 로컬과 Cloud Run 모두 애플리케이션 기본 자격 증명을 사용합니다.
@@ -39,6 +40,12 @@ const mutationRateLimit = createRateLimiter({
 
 // 로그에 토큰 전체가 노출되지 않도록 앞뒤 일부만 남깁니다.
 const maskToken = token => `${token.slice(0, 18)}...${token.slice(-6)}`;
+const { deleteDeviceRegistration, markDeviceInactive } = createDeviceRegistrationManager({
+  db,
+  tokenCollection,
+  scheduleCollection,
+  maskToken,
+});
 
 // 기기 토큰과 클라이언트 알림 ID의 조합으로 항상 같은 문서 ID를 생성합니다.
 const createScheduleId = (token, notificationId) => {
@@ -144,6 +151,22 @@ app.post('/api/register-token', mutationRateLimit, async (req, res) => {
   }
 });
 
+// 사용자가 알림을 끄면 토큰 문서와 남은 예약을 즉시 삭제합니다.
+app.delete('/api/register-token', mutationRateLimit, async (req, res) => {
+  const { token } = req.body;
+  if (!validateToken(token)) {
+    return res.status(400).json({ success: false, message: '유효하지 않은 토큰입니다.' });
+  }
+
+  try {
+    await deleteDeviceRegistration(token);
+    return res.json({ success: true });
+  } catch (error) {
+    console.error('토큰 삭제 실패:', error);
+    return res.status(500).json({ success: false, message: '토큰 삭제에 실패했습니다.' });
+  }
+});
+
 // 한 기기의 기존 예약 목록을 클라이언트가 전달한 최신 목록으로 교체합니다.
 app.put('/api/notification-schedule', mutationRateLimit, async (req, res) => {
   const { token, timezone, notifications } = req.body;
@@ -245,22 +268,6 @@ const claimNotification = async (document, expectedVersion = null) => {
     });
     return { ref: document.ref, ...data };
   });
-};
-
-// 유효하지 않은 토큰을 비활성화하고 해당 토큰의 남은 예약을 함께 제거합니다.
-const markDeviceInactive = async token => {
-  const scheduleSnapshot = await scheduleCollection.where('token', '==', token).get();
-  const batch = db.batch();
-
-  batch.set(tokenCollection.doc(token), {
-    active: false,
-    deactivatedAt: admin.firestore.FieldValue.serverTimestamp(),
-    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-  }, { merge: true });
-
-  scheduleSnapshot.forEach(document => batch.delete(document.ref));
-  await batch.commit();
-  console.log(`[토큰 비활성화] ${maskToken(token)}, 예약 ${scheduleSnapshot.size}건 삭제`);
 };
 
 notificationTaskManager = createNotificationTaskManager({
