@@ -1,18 +1,20 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Animated, Modal, Platform,
+  Alert, Animated, Linking, Modal, Platform,
   ScrollView, StyleSheet, Text, TouchableOpacity, View, Switch
 } from 'react-native';
 
 // 화면에 필요한 외부 모듈을 불러옵니다.
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Stack, router } from 'expo-router';
+import { Stack, router, type Href } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { requestNotificationUpdate } from '../services/notificationUpdateScheduler';
+import { getOrCreateNotificationTime, unregisterPushToken } from '../services/notificationService';
+import { enableNotifications } from '../useNotifications';
 import {
   DEFAULT_HOLIDAY_CACHE_RETENTION_YEARS,
   HOLIDAY_CACHE_RETENTION_KEY,
@@ -21,6 +23,11 @@ import {
 import { useTheme } from './_layout';
 
 const HOLIDAY_CACHE_OPTIONS = [1, 3, 5, 10];
+const createDefaultNotificationTime = () => {
+  const defaultTime = new Date();
+  defaultTime.setHours(9, 0, 0, 0);
+  return defaultTime;
+};
 
 export default function SettingsScreen() {
 
@@ -28,7 +35,7 @@ export default function SettingsScreen() {
   const { isDarkMode, toggleDarkMode } = useTheme(); 
   
   const [isNotiEnabled, setIsNotiEnabled] = useState(false); 
-  const [notiTime, setNotiTime] = useState(new Date());      
+  const [notiTime, setNotiTime] = useState(createDefaultNotificationTime);
   const [showPicker, setShowPicker] = useState(false);       
   const [tempNotiTime, setTempNotiTime] = useState(new Date());
 
@@ -165,7 +172,26 @@ export default function SettingsScreen() {
   const handleToggleNoti = async (value: boolean) => {
     setIsNotiEnabled(value);
     await AsyncStorage.setItem('notiEnabled', JSON.stringify(value));
-    requestNotificationUpdate(); 
+
+    if (value) {
+      setNotiTime(await getOrCreateNotificationTime());
+
+      const granted = await enableNotifications();
+      if (!granted) {
+        Alert.alert(
+          '알림 권한이 필요합니다',
+          '기기 설정에서 Checklendar 알림을 허용하면 앱으로 돌아올 때 자동으로 다시 연결됩니다.',
+          [
+            { text: '나중에', style: 'cancel' },
+            { text: '설정 열기', onPress: () => { void Linking.openSettings(); } },
+          ],
+        );
+      }
+    } else {
+      await unregisterPushToken();
+    }
+
+    requestNotificationUpdate();
   };
 
   const handleAndroidTimeChange = async (event: any, selectedDate?: Date) => {
@@ -365,6 +391,18 @@ export default function SettingsScreen() {
               </Animated.View>
             </TouchableOpacity>
           )}
+
+          {/* 개인정보 처리 내용을 앱 안에서도 언제든 확인할 수 있게 합니다. */}
+          <Animated.Text style={[styles.sectionTitle, { color: animatedColors.subTextColor, marginTop: 30 }]}>정보</Animated.Text>
+          <TouchableOpacity onPress={() => router.push('/privacy' as Href)} activeOpacity={0.7}>
+            <Animated.View style={[styles.settingItem, { backgroundColor: animatedColors.itemBgColor }]}>
+              <View style={styles.settingLabel}>
+                <Ionicons name="shield-checkmark-outline" size={22} color={isDarkMode ? "#FFD700" : "#4A90E2"} />
+                <Animated.Text style={[styles.settingText, { color: animatedColors.textColor }]}>개인정보처리방침</Animated.Text>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color={isDarkMode ? "#AAAAAA" : "#888888"} />
+            </Animated.View>
+          </TouchableOpacity>
 
           <Animated.Text style={[styles.guideText, { color: animatedColors.subTextColor }]}>
             * 공휴일 캐시 기간을 줄이면 범위를 벗어난 과거 데이터가 즉시 삭제됩니다.

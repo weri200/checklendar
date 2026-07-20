@@ -65,7 +65,7 @@ interface ThemeType {
   icon: string;            
 }
 
-const PANEL_HEIGHT = 300;  
+const MENU_PANEL_OFFSET = 300;
 
 // 스와이프 수정 및 삭제 기능을 제공하는 일정 항목입니다.
 const AnimatedTaskItem = ({ item, theme, onToggle, onDelete, onEdit }: { 
@@ -73,14 +73,14 @@ const AnimatedTaskItem = ({ item, theme, onToggle, onDelete, onEdit }: {
   theme: ThemeType; 
   onToggle: (id: string) => void; 
   onDelete: (id: string) => void;
-  onEdit: (id: string, currentText: string, currentRange: [string, string], currentColor?: string | null) => void; 
+  onEdit: (id: string, currentText: string, currentRange: [string, string], currentColor?: string | null, currentMemo?: string) => void;
 }) => {
   const swipeableRef = useRef<Swipeable>(null);
 
   // 수정 버튼 클릭 시 스와이프 닫고 수정 모달 호출 (색상 정보도 전달)
   const handleEdit = () => {
     swipeableRef.current?.close();
-    onEdit(item.id, item.text, item.range, item.color);
+    onEdit(item.id, item.text, item.range, item.color, item.memo);
   };
 
   const renderRightActions = () => (
@@ -111,6 +111,11 @@ const AnimatedTaskItem = ({ item, theme, onToggle, onDelete, onEdit }: {
             ]}>
               {item.text}
             </Text>
+            {item.memo ? (
+              <Text style={[styles.todoMemo, { color: theme.subText }]} numberOfLines={2}>
+                {item.memo}
+              </Text>
+            ) : null}
             <Text style={[styles.todoRange, { color: theme.subText }]}>
               {item.range[0]} ~ {item.range[1]}
             </Text>
@@ -164,6 +169,7 @@ export default function App() {
   const [addStartDate, setAddStartDate] = useState(viewDate);
   const [addEndDate, setAddEndDate] = useState(viewDate);
   const [taskText, setTaskText] = useState('');
+  const [taskMemo, setTaskMemo] = useState('');
   const [taskColor, setTaskColor] = useState<string | null>(null); // 새 일정 색상
   const [isColorDropdownOpen, setIsColorDropdownOpen] = useState(false);
 
@@ -171,6 +177,7 @@ export default function App() {
   const [isEditModalVisible, setEditModalVisible] = useState(false);
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [editTaskText, setEditTaskText] = useState('');
+  const [editTaskMemo, setEditTaskMemo] = useState('');
   const [editStartDate, setEditStartDate] = useState(viewDate);
   const [editEndDate, setEditEndDate] = useState(viewDate);
   const [editTaskColor, setEditTaskColor] = useState<string | null>(null); // 수정 일정 색상
@@ -179,7 +186,8 @@ export default function App() {
 
   // 하단 메뉴 애니메이션 설정
   const overlayOpacity = useRef(new Animated.Value(0)).current;            
-  const panelTranslateY = useRef(new Animated.Value(PANEL_HEIGHT)).current;
+  const panelBottom = useRef(new Animated.Value(-MENU_PANEL_OFFSET)).current;
+  const isMenuClosing = useRef(false);
 
   // 다크모드 적용 테마
   const theme = useMemo(() => ({
@@ -256,7 +264,8 @@ export default function App() {
     const finalColor = taskColor || getAvailableColor(tasks, addStartDate, addEndDate);
     const newTask: Task = {
       id: Date.now().toString(),
-      text: taskText,
+      text: taskText.trim(),
+      memo: taskMemo.trim() || undefined,
       range: [addStartDate, addEndDate],
       isDone: false,
       color: finalColor,
@@ -264,8 +273,9 @@ export default function App() {
 
     updateAndSaveTasks(addTask(tasks, newTask));
     setTaskText('');
+    setTaskMemo('');
     setModalVisible(false);
-  }, [taskText, addStartDate, addEndDate, taskColor, tasks, updateAndSaveTasks, getAvailableColor]);
+  }, [taskText, taskMemo, addStartDate, addEndDate, taskColor, tasks, updateAndSaveTasks, getAvailableColor]);
 
   // 일정의 완료 상태를 전환합니다.
   const toggleTaskCompletion = useCallback((taskId: string) => {
@@ -278,9 +288,10 @@ export default function App() {
   }, [tasks, updateAndSaveTasks]);
 
   // [기능] 수정 모달 열기 및 기존 데이터 세팅
-  const openEditModal = useCallback((id: string, currentText: string, currentRange: [string, string], currentColor?: string | null) => {
+  const openEditModal = useCallback((id: string, currentText: string, currentRange: [string, string], currentColor?: string | null, currentMemo?: string) => {
     setEditingTaskId(id);
     setEditTaskText(currentText);
+    setEditTaskMemo(currentMemo || '');
     setEditStartDate(currentRange[0]);
     setEditEndDate(currentRange[1]);
     setEditTaskColor(currentColor || null); // 기존 색상 불러오기
@@ -298,7 +309,8 @@ export default function App() {
     const finalColor = editTaskColor || getAvailableColor(tasksWithoutEdited, editStartDate, editEndDate);
     const updatedTask: Task = {
       id: editingTaskId,
-      text: editTaskText,
+      text: editTaskText.trim(),
+      memo: editTaskMemo.trim() || undefined,
       range: [editStartDate, editEndDate],
       isDone: currentTask?.isDone ?? false,
       color: finalColor,
@@ -308,24 +320,44 @@ export default function App() {
     setEditModalVisible(false);
     setEditingTaskId(null);
     setEditTaskText('');
-  }, [editingTaskId, editTaskText, editStartDate, editEndDate, editTaskColor, tasks, updateAndSaveTasks, getAvailableColor]);
+    setEditTaskMemo('');
+  }, [editingTaskId, editTaskText, editTaskMemo, editStartDate, editEndDate, editTaskColor, tasks, updateAndSaveTasks, getAvailableColor]);
 
-  const handleOpenMenu = useCallback(() => setMenuVisible(true), []);
-  const handleCloseMenu = useCallback(() => {
+  const handleOpenMenu = useCallback(() => {
+    isMenuClosing.current = false;
+    overlayOpacity.stopAnimation();
+    panelBottom.stopAnimation();
+    overlayOpacity.setValue(0);
+    panelBottom.setValue(-MENU_PANEL_OFFSET);
+    setMenuVisible(true);
+  }, [overlayOpacity, panelBottom]);
+
+  const closeMenu = useCallback((onClosed?: () => void) => {
+    if (isMenuClosing.current) return;
+    isMenuClosing.current = true;
+
     Animated.parallel([
       Animated.timing(overlayOpacity, { toValue: 0, duration: 200, useNativeDriver: true }),
-      Animated.timing(panelTranslateY, { toValue: PANEL_HEIGHT, duration: 250, useNativeDriver: true }),
-    ]).start(() => setMenuVisible(false));
-  }, [overlayOpacity, panelTranslateY]);
+      Animated.timing(panelBottom, { toValue: -MENU_PANEL_OFFSET, duration: 180, useNativeDriver: false }),
+    ]).start(({ finished }) => {
+      isMenuClosing.current = false;
+      if (!finished) return;
+      setMenuVisible(false);
+      onClosed?.();
+    });
+  }, [overlayOpacity, panelBottom]);
+
+  const handleCloseMenu = useCallback(() => closeMenu(), [closeMenu]);
+  const handleMenuAction = useCallback((action: () => void) => closeMenu(action), [closeMenu]);
 
   useEffect(() => {
     if (isMenuVisible) {
       Animated.parallel([
         Animated.timing(overlayOpacity, { toValue: 1, duration: 300, useNativeDriver: true }),
-        Animated.spring(panelTranslateY, { toValue: 0, speed: 12, bounciness: 5, useNativeDriver: true }),
+        Animated.timing(panelBottom, { toValue: 0, duration: 120, useNativeDriver: false }),
       ]).start();
     }
-  }, [isMenuVisible, overlayOpacity, panelTranslateY]);
+  }, [isMenuVisible, overlayOpacity, panelBottom]);
 
   const handleDayPressInModal = useCallback((day: any) => {
     const clickedDate = day.dateString;
@@ -408,8 +440,9 @@ export default function App() {
 
   const openModal = useCallback(() => {
     setAddStartDate(viewDate); 
-    setAddEndDate(viewDate); 
-    setTaskText(''); 
+    setAddEndDate(viewDate);
+    setTaskText('');
+    setTaskMemo('');
     setTaskColor(null); // 추가 모달 열 때 색상 초기화
     setIsColorDropdownOpen(false);
     setModalVisible(true);
@@ -589,6 +622,17 @@ export default function App() {
                   <Text style={[styles.inputLabel, { color: theme.subText }]}>할 일 내용</Text>
                   <TextInput style={[styles.textInput, { backgroundColor: theme.card, color: theme.text, borderColor: theme.border, marginBottom: 20 }]} placeholder="어떤 일정이 있나요?" placeholderTextColor={theme.subText} value={taskText} onChangeText={setTaskText} />
 
+                  <Text style={[styles.inputLabel, { color: theme.subText }]}>메모 (선택)</Text>
+                  <TextInput
+                    style={[styles.textInput, styles.memoInput, { backgroundColor: theme.card, color: theme.text, borderColor: theme.border, marginBottom: 20 }]}
+                    placeholder="간단한 메모를 남겨보세요"
+                    placeholderTextColor={theme.subText}
+                    value={taskMemo}
+                    onChangeText={setTaskMemo}
+                    multiline
+                    maxLength={200}
+                  />
+
                   {/* 색상 선택 드롭다운. */}
                   <Text style={[styles.inputLabel, { color: theme.subText }]}>일정 색상</Text>
                   <TouchableOpacity onPress={() => setIsColorDropdownOpen(!isColorDropdownOpen)} activeOpacity={0.7}>
@@ -654,6 +698,17 @@ export default function App() {
                   <Text style={[styles.inputLabel, { color: theme.subText }]}>할 일 내용</Text>
                   <TextInput style={[styles.textInput, { backgroundColor: theme.card, color: theme.text, borderColor: theme.border, marginBottom: 20 }]} placeholder="수정할 내용을 입력하세요" placeholderTextColor={theme.subText} value={editTaskText} onChangeText={setEditTaskText} />
 
+                  <Text style={[styles.inputLabel, { color: theme.subText }]}>메모 (선택)</Text>
+                  <TextInput
+                    style={[styles.textInput, styles.memoInput, { backgroundColor: theme.card, color: theme.text, borderColor: theme.border, marginBottom: 20 }]}
+                    placeholder="간단한 메모를 남겨보세요"
+                    placeholderTextColor={theme.subText}
+                    value={editTaskMemo}
+                    onChangeText={setEditTaskMemo}
+                    multiline
+                    maxLength={200}
+                  />
+
                   {/* 수정용 색상 선택 드롭다운. */}
                   <Text style={[styles.inputLabel, { color: theme.subText }]}>일정 색상</Text>
                   <TouchableOpacity onPress={() => setIsEditColorDropdownOpen(!isEditColorDropdownOpen)} activeOpacity={0.7}>
@@ -691,9 +746,9 @@ export default function App() {
         </Modal>
 
         {/* 화면 이동과 설정을 위한 하단 메뉴입니다. */}
-        <Modal visible={isMenuVisible} transparent={true} animationType="none">
+        <Modal visible={isMenuVisible} transparent={true} animationType="none" onRequestClose={handleCloseMenu}>
           <Animated.View style={[styles.menuOverlay, { opacity: overlayOpacity }]}><TouchableOpacity style={styles.overlayTouchArea} activeOpacity={1} onPress={handleCloseMenu} /></Animated.View>
-          <Animated.View style={[styles.menuPanel, { backgroundColor: theme.card, transform: [{ translateY: panelTranslateY }] }]}>
+          <Animated.View style={[styles.menuPanel, { backgroundColor: theme.card, bottom: panelBottom }]}>
             <View style={styles.handleBar} /> 
             <SafeAreaView edges={['bottom']} style={styles.menuSafeArea}>
               <View style={styles.menuHeader}>
@@ -703,17 +758,17 @@ export default function App() {
                 </TouchableOpacity>
               </View>
               
-              <TouchableOpacity style={styles.menuItem} onPress={() => { handleCloseMenu(); router.push('/monthly'); }}>
+              <TouchableOpacity style={styles.menuItem} onPress={() => handleMenuAction(() => router.push('/monthly'))}>
                 <Ionicons name="list" size={22} color={theme.subText} />
                 <Text style={[styles.menuItemText, { color: theme.text }]}>일정 모아보기</Text>
               </TouchableOpacity>
 
-              <TouchableOpacity style={styles.menuItem} onPress={() => { handleCloseMenu(); router.push('/settings'); }}>
+              <TouchableOpacity style={styles.menuItem} onPress={() => handleMenuAction(() => router.push('/settings'))}>
                 <Ionicons name="settings-outline" size={22} color={theme.subText} />
                 <Text style={[styles.menuItemText, { color: theme.text }]}>설정</Text>
               </TouchableOpacity>
 
-              <TouchableOpacity style={styles.menuItem} onPress={() => { handleCloseMenu(); updateAndSaveTasks({}); }}>
+              <TouchableOpacity style={styles.menuItem} onPress={() => handleMenuAction(() => updateAndSaveTasks({}))}>
                 <Ionicons name="trash-outline" size={22} color="#FF5252" />
                 <Text style={[styles.menuItemText, { color: '#FF5252' }]}>모든 일정 지우기</Text>
               </TouchableOpacity>
@@ -760,6 +815,7 @@ const styles = StyleSheet.create({
   todoItem: { padding: 16, borderRadius: 15, marginBottom: 12, elevation: 1, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 3 },
   todoContent: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   todoText: { fontSize: 16, fontWeight: '600' },
+  todoMemo: { fontSize: 12, lineHeight: 17, marginTop: 4 },
   todoRange: { fontSize: 11, marginTop: 4 },
   emptyText: { textAlign: 'center', marginTop: 30, fontSize: 15 },
 
@@ -784,6 +840,7 @@ const styles = StyleSheet.create({
   inputSection: { padding: 20 },
   inputLabel: { fontSize: 14, marginBottom: 10, fontWeight: '600' },
   textInput: { padding: 15, borderRadius: 12, fontSize: 16, borderWidth: 1 },
+  memoInput: { minHeight: 82, textAlignVertical: 'top' },
 
   dropdownHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 15, borderRadius: 12, borderWidth: 1 },
   dropdownOpenRadius: { borderBottomLeftRadius: 0, borderBottomRightRadius: 0 },
@@ -793,7 +850,7 @@ const styles = StyleSheet.create({
 
   menuOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0, 0, 0, 0.4)', zIndex: 10 },
   overlayTouchArea: { flex: 1 },
-  menuPanel: { position: 'absolute', bottom: 0, width: '100%', borderTopLeftRadius: 30, borderTopRightRadius: 30, paddingTop: 12, zIndex: 20 },
+  menuPanel: { position: 'absolute', width: '100%', borderTopLeftRadius: 30, borderTopRightRadius: 30, paddingTop: 12, zIndex: 20 },
   handleBar: { width: 40, height: 5, backgroundColor: '#E0E0E0', borderRadius: 3, alignSelf: 'center', marginBottom: 10 },
   menuSafeArea: { paddingHorizontal: 25, paddingBottom: 20 },
   menuHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 15 },

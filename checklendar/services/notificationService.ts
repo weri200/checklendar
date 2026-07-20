@@ -9,6 +9,8 @@ const PUSH_SERVER_URL = process.env.EXPO_PUBLIC_PUSH_SERVER_URL?.trim().replace(
 const REGISTERED_TOKEN_KEY = '@checklendar_registered_push_token';
 const REQUEST_TIMEOUT_MS = 10_000;
 const MAX_SCHEDULED_NOTIFICATIONS = 30;
+const MAX_SCHEDULE_AHEAD_MS = 30 * 24 * 60 * 60 * 1000;
+const DEFAULT_NOTIFICATION_HOUR = 9;
 
 interface RegisteredToken {
   serverUrl: string;
@@ -24,6 +26,19 @@ interface ServerNotification {
 
 let registrationQueue: Promise<boolean> = Promise.resolve(true);
 let scheduleSyncQueue: Promise<void> = Promise.resolve();
+
+export const getOrCreateNotificationTime = async (): Promise<Date> => {
+  const savedTime = await AsyncStorage.getItem('notiTime');
+  if (savedTime) {
+    const parsedTime = new Date(savedTime);
+    if (!Number.isNaN(parsedTime.getTime())) return parsedTime;
+  }
+
+  const defaultTime = new Date();
+  defaultTime.setHours(DEFAULT_NOTIFICATION_HOUR, 0, 0, 0);
+  await AsyncStorage.setItem('notiTime', defaultTime.toISOString());
+  return defaultTime;
+};
 
 // 모든 서버 요청에 공통 헤더와 제한 시간을 적용합니다.
 const requestJson = async (path: string, init: RequestInit): Promise<void> => {
@@ -114,10 +129,40 @@ export const registerPushToken = (token: string): Promise<boolean> => {
   return registrationQueue;
 };
 
+// 사용자가 알림을 끄면 서버의 토큰과 남아 있는 예약을 함께 삭제합니다.
+const performTokenUnregistration = async (): Promise<boolean> => {
+  const registeredToken = await readRegisteredToken();
+  if (!registeredToken) return true;
+
+  try {
+    await requestJson('/api/register-token', {
+      method: 'DELETE',
+      body: JSON.stringify({ token: registeredToken.token }),
+    });
+    await AsyncStorage.removeItem(REGISTERED_TOKEN_KEY);
+    console.log('서버의 FCM 토큰과 예약 삭제 완료');
+    return true;
+  } catch (error) {
+    // 다음 앱 실행 때 다시 정리할 수 있도록 등록 정보는 남겨 둡니다.
+    console.error('푸시 토큰 삭제 실패:', error);
+    return false;
+  }
+};
+
+export const unregisterPushToken = (): Promise<boolean> => {
+  const runUnregistration = () => performTokenUnregistration().catch(error => {
+    console.error('푸시 토큰 삭제 처리 실패:', error);
+    return false;
+  });
+  registrationQueue = registrationQueue.then(runUnregistration, runUnregistration);
+  return registrationQueue;
+};
+
 // 완료하지 않은 미래 일정만 서버에서 발송할 알림 형식으로 변환합니다.
 const buildServerNotifications = (tasks: TaskState, notificationTime: Date): ServerNotification[] => {
   const now = new Date();
   const today = formatLocalDate(now);
+  const latestScheduledAt = now.getTime() + MAX_SCHEDULE_AHEAD_MS;
 
   return Object.keys(tasks)
     .filter(date => date >= today)
@@ -129,6 +174,8 @@ const buildServerNotifications = (tasks: TaskState, notificationTime: Date): Ser
       const scheduledDate = parseLocalDate(date);
       scheduledDate.setHours(notificationTime.getHours(), notificationTime.getMinutes(), 0, 0);
       if (scheduledDate <= now) return [];
+      // 서버가 허용하는 예약 범위 밖의 일정은 다음 앱 실행 때 범위에 들어오면 동기화합니다.
+      if (scheduledDate.getTime() > latestScheduledAt) return [];
 
       return [{
         id: date,
