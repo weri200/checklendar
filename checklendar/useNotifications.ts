@@ -23,7 +23,10 @@ Notifications.setNotificationHandler({
 
 let initializationQueue: Promise<boolean> = Promise.resolve(true);
 
-const initializeNotifications = async (requestPermission: boolean): Promise<boolean> => {
+const initializeNotifications = async (
+  requestPermission: boolean,
+  forceScheduleSync: boolean,
+): Promise<boolean> => {
   // 현재 서버는 Android FCM 토큰을 직접 사용합니다.
   if (Platform.OS !== 'android') {
     console.log('FCM 직접 알림은 현재 Android에서만 초기화합니다.');
@@ -67,14 +70,17 @@ const initializeNotifications = async (requestPermission: boolean): Promise<bool
   const token = devicePushToken.data;
   // 토큰 등록에 성공한 경우에만 해당 기기의 예약 목록을 서버와 동기화합니다.
   if (await registerPushToken(token)) {
-    await syncNotificationSchedule();
+    await syncNotificationSchedule({ force: forceScheduleSync });
     return true;
   }
   return false;
 };
 
-const queueInitialization = (requestPermission: boolean): Promise<boolean> => {
-  const runInitialization = () => initializeNotifications(requestPermission).catch(error => {
+const queueInitialization = (
+  requestPermission: boolean,
+  forceScheduleSync: boolean,
+): Promise<boolean> => {
+  const runInitialization = () => initializeNotifications(requestPermission, forceScheduleSync).catch(error => {
     console.error('알림 초기화 실패:', error);
     return false;
   });
@@ -82,16 +88,17 @@ const queueInitialization = (requestPermission: boolean): Promise<boolean> => {
   return initializationQueue;
 };
 
-// 설정 스위치를 켰을 때만 시스템 권한을 요청합니다.
-export const enableNotifications = (): Promise<boolean> => queueInitialization(true);
+// 설정 스위치를 켜면 권한을 요청하고 현재 예약을 즉시 강제 동기화합니다.
+export const enableNotifications = (): Promise<boolean> => queueInitialization(true, true);
 
 // 앱 시작/복귀 시 저장된 사용자 선택과 현재 시스템 권한을 조용히 다시 확인합니다.
+// 같은 날짜의 토큰·시간대·예약이 그대로라면 서버 동기화는 생략됩니다.
 const refreshNotificationRegistration = async () => {
   const enabledValue = await AsyncStorage.getItem('notiEnabled');
   const enabled = enabledValue ? JSON.parse(enabledValue) : false;
   if (enabled) {
     await getOrCreateNotificationTime();
-    await queueInitialization(false);
+    await queueInitialization(false, false);
   } else {
     await unregisterPushToken();
   }

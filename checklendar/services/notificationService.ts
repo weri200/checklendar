@@ -7,6 +7,7 @@ import { getAppCheckToken } from './appCheckService';
 const PUSH_SERVER_URL = process.env.EXPO_PUBLIC_PUSH_SERVER_URL?.trim().replace(/\/+$/, '');
 // 기존 키를 유지해 Expo 토큰을 새 FCM 토큰으로 교체할 때 서버 예약도 함께 정리합니다.
 const REGISTERED_TOKEN_KEY = '@checklendar_registered_push_token';
+const LAST_NOTIFICATION_SYNC_KEY = '@checklendar_last_notification_sync';
 const REQUEST_TIMEOUT_MS = 10_000;
 const MAX_SCHEDULED_NOTIFICATIONS = 30;
 const MAX_SCHEDULE_AHEAD_MS = 30 * 24 * 60 * 60 * 1000;
@@ -22,6 +23,17 @@ interface ServerNotification {
   scheduledAt: string;
   title: string;
   body: string;
+}
+
+interface LastNotificationSync {
+  date: string;
+  timezone: string;
+  token: string;
+  scheduleFingerprint: string;
+}
+
+interface NotificationScheduleSyncOptions {
+  force?: boolean;
 }
 
 let registrationQueue: Promise<boolean> = Promise.resolve(true);
@@ -132,14 +144,17 @@ export const registerPushToken = (token: string): Promise<boolean> => {
 // 사용자가 알림을 끄면 서버의 토큰과 남아 있는 예약을 함께 삭제합니다.
 const performTokenUnregistration = async (): Promise<boolean> => {
   const registeredToken = await readRegisteredToken();
-  if (!registeredToken) return true;
+  if (!registeredToken) {
+    await AsyncStorage.removeItem(LAST_NOTIFICATION_SYNC_KEY);
+    return true;
+  }
 
   try {
     await requestJson('/api/register-token', {
       method: 'DELETE',
       body: JSON.stringify({ token: registeredToken.token }),
     });
-    await AsyncStorage.removeItem(REGISTERED_TOKEN_KEY);
+    await AsyncStorage.multiRemove([REGISTERED_TOKEN_KEY, LAST_NOTIFICATION_SYNC_KEY]);
     console.log('서버의 FCM 토큰과 예약 삭제 완료');
     return true;
   } catch (error) {
@@ -187,8 +202,39 @@ const buildServerNotifications = (tasks: TaskState, notificationTime: Date): Ser
     .slice(0, MAX_SCHEDULED_NOTIFICATIONS);
 };
 
+const createScheduleFingerprint = (notifications: ServerNotification[]): string => JSON.stringify(
+  notifications.map(notification => [
+    notification.id,
+    notification.scheduledAt,
+    notification.title,
+    notification.body,
+  ]),
+);
+
+const readLastNotificationSync = async (): Promise<LastNotificationSync | null> => {
+  const savedValue = await AsyncStorage.getItem(LAST_NOTIFICATION_SYNC_KEY);
+  if (!savedValue) return null;
+
+  try {
+    return JSON.parse(savedValue) as LastNotificationSync;
+  } catch {
+    return null;
+  }
+};
+
+const matchesLastNotificationSync = (
+  lastSync: LastNotificationSync | null,
+  currentSync: LastNotificationSync,
+): boolean => Boolean(
+  lastSync
+  && lastSync.date === currentSync.date
+  && lastSync.timezone === currentSync.timezone
+  && lastSync.token === currentSync.token
+  && lastSync.scheduleFingerprint === currentSync.scheduleFingerprint,
+);
+
 // 로컬 설정과 일정을 읽어 서버의 예약 목록 전체를 최신 상태로 맞춥니다.
-const performNotificationScheduleSync = async (): Promise<void> => {
+const performNotificationScheduleSync = async ({ force = true }: NotificationScheduleSyncOptions): Promise<void> => {
   const registeredToken = await readRegisteredToken();
   if (!registeredToken) {
     console.log('등록된 푸시 토큰이 없어 서버 일정 동기화를 건너뜁니다.');
@@ -203,19 +249,32 @@ const performNotificationScheduleSync = async (): Promise<void> => {
 
   const enabled = enabledValue ? JSON.parse(enabledValue) : false;
   const tasks = tasksValue ? JSON.parse(tasksValue) as TaskState : {};
+  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
   const notifications = enabled && timeValue
     ? buildServerNotifications(tasks, new Date(timeValue))
     : [];
+  const currentSync: LastNotificationSync = {
+    date: formatLocalDate(new Date()),
+    timezone,
+    token: registeredToken.token,
+    scheduleFingerprint: createScheduleFingerprint(notifications),
+  };
+
+  if (!force && matchesLastNotificationSync(await readLastNotificationSync(), currentSync)) {
+    console.log('오늘 처리한 알림 일정과 변경 사항이 없어 서버 동기화를 건너뜁니다.');
+    return;
+  }
 
   try {
     await requestJson('/api/notification-schedule', {
       method: 'PUT',
       body: JSON.stringify({
         token: registeredToken.token,
-        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        timezone,
         notifications,
       }),
     });
+    await AsyncStorage.setItem(LAST_NOTIFICATION_SYNC_KEY, JSON.stringify(currentSync));
     console.log(`서버 알림 일정 ${notifications.length}건 동기화 완료`);
   } catch (error) {
     console.error('서버 알림 일정 동기화 실패:', error);
@@ -223,8 +282,8 @@ const performNotificationScheduleSync = async (): Promise<void> => {
 };
 
 // 일정 동기화가 겹쳐도 서버에는 한 번에 하나씩 요청합니다.
-export const syncNotificationSchedule = (): Promise<void> => {
-  const runSync = () => performNotificationScheduleSync().catch(error => {
+export const syncNotificationSchedule = (options: NotificationScheduleSyncOptions = {}): Promise<void> => {
+  const runSync = () => performNotificationScheduleSync(options).catch(error => {
     console.error('서버 알림 일정 처리 실패:', error);
   });
   scheduleSyncQueue = scheduleSyncQueue.then(runSync, runSync);

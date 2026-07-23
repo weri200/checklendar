@@ -37,6 +37,6 @@ npx tsc --noEmit
 
 ## Play 배포 준비
 
-- 개인정보처리방침: [`../PRIVACY_POLICY.md`](../PRIVACY_POLICY.md)
+- 개인정보처리방침: [공개 HTTPS 페이지](https://gist.github.com/weri200/2c304c60607d5cafc3e89f7bf5ca2137)
 - 데이터 보안 작성안: [`../PLAY_DATA_SAFETY.md`](../PLAY_DATA_SAFETY.md)
 - App Check 및 내부 테스트 체크리스트: [`../PLAY_RELEASE_CHECKLIST.md`](../PLAY_RELEASE_CHECKLIST.md)
