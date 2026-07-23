@@ -17,6 +17,6 @@
 
 ## Play Console 개인정보 항목
 
-1. `PRIVACY_POLICY.md`를 공개 HTTPS 주소에 게시하고 개인정보처리방침 URL에 입력합니다.
+1. 공개된 [Checklendar 개인정보처리방침](https://gist.github.com/weri200/2c304c60607d5cafc3e89f7bf5ca2137)을 Play Console의 개인정보처리방침 URL에 입력합니다.
 2. `PLAY_DATA_SAFETY.md`의 작성안을 실제 Play Console 문항과 대조하여 제출합니다.
 3. 스토어 등록정보의 개발자 이메일이 실제 문의 수신 가능한 주소인지 확인합니다.
