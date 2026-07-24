@@ -1,0 +1,27 @@
+[
+  {
+    "name": "delete-old-cloud-run-images",
+    "action": {
+      "type": "Delete"
+    },
+    "condition": {
+      "tagState": "any",
+      "packageNamePrefixes": [
+        "checklendar-api"
+      ],
+      "olderThan": "1d"
+    }
+  },
+  {
+    "name": "keep-recent-cloud-run-images",
+    "action": {
+      "type": "Keep"
+    },
+    "mostRecentVersions": {
+      "packageNamePrefixes": [
+        "checklendar-api"
+      ],
+      "keepCount": 5
+    }
+  }
+]

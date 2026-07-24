@@ -88,6 +88,34 @@ gcloud projects add-iam-policy-binding PROJECT_ID \
   --role=roles/firebaseappcheck.tokenVerifier
 ```
 
+### Artifact Registry 이미지 자동 정리
+
+소스 배포 때 생성되는 컨테이너 이미지가 계속 누적되지 않도록 최신 5개 이미지는
+보존하고, 생성 후 1일이 지난 나머지 이미지는 자동 삭제합니다.
+
+먼저 dry-run으로 정책을 검증합니다.
+
+```bash
+gcloud artifacts repositories set-cleanup-policies cloud-run-source-deploy \
+  --project=checklendar-e5327 \
+  --location=asia-northeast3 \
+  --policy=server/artifact-cleanup-policy.json \
+  --dry-run
+```
+
+검증 후 실제 정리를 활성화합니다.
+
+```bash
+gcloud artifacts repositories set-cleanup-policies cloud-run-source-deploy \
+  --project=checklendar-e5327 \
+  --location=asia-northeast3 \
+  --policy=server/artifact-cleanup-policy.json \
+  --no-dry-run
+```
+
+Artifact Registry의 백그라운드 작업이 정책을 적용하므로 실제 용량 감소까지 하루 정도
+걸릴 수 있습니다.
+
 Firebase Console의 App Check에서 Android 앱을 Play Integrity 공급자로 등록하고 릴리스 서명 인증서의 SHA-256을 추가합니다. 개발 APK는 별도의 디버그 토큰을 등록해 사용하며, 실제 토큰은 `.env.local`에만 저장합니다. 기존 앱에서 점진적으로 전환할 때는 `APP_CHECK_ENFORCEMENT=monitor`로 검증 로그를 확인한 다음 `enforce`로 바꿉니다.
 
 ## 자정 Scheduler 생성
