@@ -230,6 +230,7 @@ npm test
 - Cloud Run 최소 인스턴스: `0`
 - Cloud Run 최대 인스턴스: `3`
 - Cloud Tasks 제한: 초당 `5`, 동시 `2`, 최대 재시도 `5`
+- 활성 알림 기기 제한: 최대 `100`대
 - 공개 API: Firebase App Check 강제 검증, IP·기기 토큰 단위 요청 제한
 - Secret Manager:
   - `public-data-service-key`
@@ -250,6 +251,7 @@ https://checklendar-api-1045415573044.asia-northeast3.run.app
 - 로그에는 FCM 토큰 전체를 출력하지 않습니다.
 - 내부 Cloud Tasks·Scheduler API는 별도의 비밀 헤더로 검증합니다.
 - 공개 API는 Firebase App Check로 정상 앱에서 발급한 토큰만 허용합니다.
+- 활성 알림 기기는 최대 100대로 제한하고, 등록된 토큰만 예약 동기화를 허용합니다.
 - 예약은 기기당 최대 30개, 현재부터 31일 이내로 제한합니다.
 - Cloud Run 서비스 계정에는 Firestore, Cloud Tasks, FCM, App Check 검증에 필요한 최소 권한만 부여합니다.
 

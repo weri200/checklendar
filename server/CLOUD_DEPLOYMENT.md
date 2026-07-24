@@ -47,7 +47,7 @@ gcloud run deploy checklendar-api \
   --min-instances=0 \
   --max-instances=3 \
   --service-account=checklendar-server@PROJECT_ID.iam.gserviceaccount.com \
-  --set-env-vars=CLOUD_TASKS_PROJECT_ID=PROJECT_ID,CLOUD_TASKS_LOCATION=asia-northeast3,CLOUD_TASKS_QUEUE=checklendar-notifications,NOTIFICATION_TIMEZONE=Asia/Seoul,FIREBASE_ANDROID_APP_ID=FIREBASE_APP_ID,APP_CHECK_ENFORCEMENT=enforce
+  --set-env-vars=CLOUD_TASKS_PROJECT_ID=PROJECT_ID,CLOUD_TASKS_LOCATION=asia-northeast3,CLOUD_TASKS_QUEUE=checklendar-notifications,NOTIFICATION_TIMEZONE=Asia/Seoul,FIREBASE_ANDROID_APP_ID=FIREBASE_APP_ID,APP_CHECK_ENFORCEMENT=enforce,MAX_ACTIVE_NOTIFICATION_DEVICES=100
 ```
 
 배포 후 생성된 URL을 확인하고 Cloud Tasks용 환경변수를 추가합니다.
