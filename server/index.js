@@ -7,7 +7,10 @@ const { createNotificationTaskManager } = require('./notificationTaskManager');
 const { registerHolidayRoutes } = require('./holidayService');
 const { createAppCheckMiddleware } = require('./appCheckMiddleware');
 const { createRateLimiter } = require('./rateLimitMiddleware');
-const { createDeviceRegistrationManager } = require('./deviceRegistration');
+const {
+  ACTIVE_DEVICE_LIMIT_REACHED,
+  createDeviceRegistrationManager,
+} = require('./deviceRegistration');
 require('dotenv').config();
 
 // 로컬과 Cloud Run 모두 애플리케이션 기본 자격 증명을 사용합니다.
@@ -18,6 +21,11 @@ const messaging = admin.messaging();
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
 const MAX_NOTIFICATIONS_PER_DEVICE = 30;
+const configuredActiveDeviceLimit = Number(process.env.MAX_ACTIVE_NOTIFICATION_DEVICES);
+const MAX_ACTIVE_NOTIFICATION_DEVICES = Number.isInteger(configuredActiveDeviceLimit)
+  && configuredActiveDeviceLimit > 0
+  ? configuredActiveDeviceLimit
+  : 100;
 const DUE_NOTIFICATION_LIMIT = 100;
 const PROCESSING_LEASE_MS = 5 * 60 * 1000;
 const MAX_SCHEDULE_AHEAD_MS = 31 * 24 * 60 * 60 * 1000;
@@ -40,11 +48,16 @@ const mutationRateLimit = createRateLimiter({
 
 // 로그에 토큰 전체가 노출되지 않도록 앞뒤 일부만 남깁니다.
 const maskToken = token => `${token.slice(0, 18)}...${token.slice(-6)}`;
-const { deleteDeviceRegistration, markDeviceInactive } = createDeviceRegistrationManager({
+const {
+  registerDevice,
+  deleteDeviceRegistration,
+  markDeviceInactive,
+} = createDeviceRegistrationManager({
   db,
   tokenCollection,
   scheduleCollection,
   maskToken,
+  maxActiveDevices: MAX_ACTIVE_NOTIFICATION_DEVICES,
 });
 
 // 기기 토큰과 클라이언트 알림 ID의 조합으로 항상 같은 문서 ID를 생성합니다.
@@ -126,26 +139,34 @@ app.post('/api/register-token', mutationRateLimit, async (req, res) => {
   }
 
   try {
-    await tokenCollection.doc(token).set({
-      token,
-      platform,
-      active: true,
-      deactivatedAt: admin.firestore.FieldValue.delete(),
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-    }, { merge: true });
-
-    // Expo 토큰에서 FCM 토큰으로 전환한 기기의 오래된 예약을 제거합니다.
-    if (
+    const validPreviousToken = (
       typeof previousToken === 'string'
       && previousToken !== token
       && (validateToken(previousToken) || validateLegacyExpoToken(previousToken))
-    ) {
-      await markDeviceInactive(previousToken);
-    }
+    ) ? previousToken : null;
+    await registerDevice({
+      token,
+      previousToken: validPreviousToken,
+      data: {
+        token,
+        platform,
+        active: true,
+        deactivatedAt: admin.firestore.FieldValue.delete(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      },
+    });
 
     console.log(`[토큰 등록] ${maskToken(token)}`);
     return res.json({ success: true });
   } catch (error) {
+    if (error?.code === ACTIVE_DEVICE_LIMIT_REACHED) {
+      return res.status(503).json({
+        success: false,
+        code: ACTIVE_DEVICE_LIMIT_REACHED,
+        message: error.message,
+        limit: MAX_ACTIVE_NOTIFICATION_DEVICES,
+      });
+    }
     console.error('토큰 저장 실패:', error);
     return res.status(500).json({ success: false, message: '토큰 저장에 실패했습니다.' });
   }
@@ -182,6 +203,14 @@ app.put('/api/notification-schedule', mutationRateLimit, async (req, res) => {
   }
 
   try {
+    const registeredTokenSnapshot = await tokenCollection.doc(token).get();
+    if (!registeredTokenSnapshot.exists || registeredTokenSnapshot.data().active !== true) {
+      return res.status(403).json({
+        success: false,
+        message: '등록되지 않은 알림 기기입니다.',
+      });
+    }
+
     const existingSnapshot = await scheduleCollection.where('token', '==', token).get();
     const existingDocuments = new Map(
       existingSnapshot.docs.map(document => [document.id, document]),
@@ -224,13 +253,10 @@ app.put('/api/notification-schedule', mutationRateLimit, async (req, res) => {
       });
     });
 
-    batch.set(tokenCollection.doc(token), {
-      token,
-      active: true,
-      deactivatedAt: admin.firestore.FieldValue.delete(),
+    batch.update(tokenCollection.doc(token), {
       timezone: typeof timezone === 'string' ? timezone.slice(0, 100) : null,
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-    }, { merge: true });
+    });
 
     await batch.commit();
     const queuedCount = notificationTaskManager?.enabled
