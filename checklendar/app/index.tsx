@@ -24,6 +24,7 @@ import {
 import type { Task, TaskState } from '../types/task';
 import { requestNotificationUpdate } from '../services/notificationUpdateScheduler';
 import { loadHolidays, type Holiday } from '../services/holidayService';
+import { TaskDetailsModal } from '../components/TaskDetailsModal';
 import { useTheme } from './_layout';
 import { formatLocalDate, getDateRange, parseLocalDate } from '../utils/date';
 
@@ -68,12 +69,13 @@ interface ThemeType {
 const MENU_PANEL_OFFSET = 300;
 
 // 스와이프 수정 및 삭제 기능을 제공하는 일정 항목입니다.
-const AnimatedTaskItem = ({ item, theme, onToggle, onDelete, onEdit }: { 
-  item: Task; 
-  theme: ThemeType; 
-  onToggle: (id: string) => void; 
+const AnimatedTaskItem = ({ item, theme, onToggle, onDelete, onEdit, onShowDetails }: {
+  item: Task;
+  theme: ThemeType;
+  onToggle: (id: string) => void;
   onDelete: (id: string) => void;
   onEdit: (id: string, currentText: string, currentRange: [string, string], currentColor?: string | null, currentMemo?: string) => void;
+  onShowDetails: (task: Task) => void;
 }) => {
   const swipeableRef = useRef<Swipeable>(null);
 
@@ -100,7 +102,12 @@ const AnimatedTaskItem = ({ item, theme, onToggle, onDelete, onEdit }: {
   return (
     <Swipeable ref={swipeableRef} renderRightActions={renderRightActions} friction={2} overshootRight={false}>
       <View style={[styles.todoItem, { backgroundColor: theme.card, borderLeftWidth: 4, borderLeftColor: item.isDone ? '#34C759' : (item.color || getTaskColor(item.id)) }]}>
-        <TouchableOpacity activeOpacity={0.7} onPress={() => onToggle(item.id)} style={styles.todoContent}>
+        <TouchableOpacity
+          activeOpacity={0.7}
+          onPress={() => onToggle(item.id)}
+          onLongPress={() => onShowDetails(item)}
+          style={styles.todoContent}
+        >
           <View style={{ flex: 1 }}>
             <Text style={[
               styles.todoText, 
@@ -159,6 +166,7 @@ export default function App() {
   const [monthFormat, setMonthFormat] = useState('yyyy년 MM월');
   const [calendarYear, setCalendarYear] = useState(Number(viewDate.slice(0, 4)));
   const [holidays, setHolidays] = useState<Record<string, Holiday>>({});
+  const [detailTask, setDetailTask] = useState<Task | null>(null);
 
   // [상태 관리] UI 모달 표시 여부
   const [isModalVisible, setModalVisible] = useState(false);               
@@ -396,19 +404,10 @@ export default function App() {
 
   const modalMarkedDates = useMemo(() => {
     const marks: { [key: string]: any } = {};
-    const range = [];
-    let curr = new Date(`${addStartDate}T00:00:00`);
-    const end = new Date(`${addEndDate}T00:00:00`);
-    while (curr <= end) {
-      const y = curr.getFullYear();
-      const m = String(curr.getMonth() + 1).padStart(2, '0');
-      const d = String(curr.getDate()).padStart(2, '0');
-      range.push(`${y}-${m}-${d}`);
-      curr.setDate(curr.getDate() + 1);
-    }
+    const range = getDateRange(addStartDate, addEndDate);
     range.forEach((d, i) => {
-      marks[d] = { 
-        color: i === 0 || i === range.length - 1 ? '#4A90E2' : (isDarkMode ? '#2C3E50' : '#E3F2FD'), 
+      marks[d] = {
+        color: i === 0 || i === range.length - 1 ? '#4A90E2' : (isDarkMode ? '#2C3E50' : '#E3F2FD'),
         textColor: theme.text, startingDay: i === 0, endingDay: i === range.length - 1 
       };
     });
@@ -417,19 +416,10 @@ export default function App() {
 
   const editModalMarkedDates = useMemo(() => {
     const marks: { [key: string]: any } = {};
-    const range = [];
-    let curr = new Date(`${editStartDate}T00:00:00`);
-    const end = new Date(`${editEndDate}T00:00:00`);
-    while (curr <= end) {
-      const y = curr.getFullYear();
-      const m = String(curr.getMonth() + 1).padStart(2, '0');
-      const d = String(curr.getDate()).padStart(2, '0');
-      range.push(`${y}-${m}-${d}`);
-      curr.setDate(curr.getDate() + 1);
-    }
+    const range = getDateRange(editStartDate, editEndDate);
     range.forEach((d, i) => {
-      marks[d] = { 
-        color: i === 0 || i === range.length - 1 ? '#4A90E2' : (isDarkMode ? '#2C3E50' : '#E3F2FD'), 
+      marks[d] = {
+        color: i === 0 || i === range.length - 1 ? '#4A90E2' : (isDarkMode ? '#2C3E50' : '#E3F2FD'),
         textColor: theme.text, startingDay: i === 0, endingDay: i === range.length - 1 
       };
     });
@@ -581,6 +571,7 @@ export default function App() {
                   onToggle={toggleTaskCompletion} 
                   onDelete={deleteTaskPermanently}
                   onEdit={openEditModal}
+                  onShowDetails={setDetailTask}
                 />
               ))
             ) : (
@@ -592,6 +583,12 @@ export default function App() {
         <TouchableOpacity style={styles.fab} onPress={openModal}>
           <Ionicons name="add" size={32} color="#FFF" />
         </TouchableOpacity>
+
+        <TaskDetailsModal
+          task={detailTask}
+          dark={isDarkMode}
+          onClose={() => setDetailTask(null)}
+        />
 
         {/* 모달: 새 일정 등록. */}
         <Modal visible={isModalVisible} animationType="slide" presentationStyle="pageSheet">

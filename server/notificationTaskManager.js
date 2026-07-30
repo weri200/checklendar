@@ -138,11 +138,11 @@ const createNotificationTaskManager = ({
   const queueSchedules = async schedules => {
     if (!enabled || schedules.length === 0) return 0;
 
-    let queuedCount = 0;
-    for (const schedule of schedules) {
-      if (await queueSchedule(schedule.id, schedule)) queuedCount += 1;
-    }
-    return queuedCount;
+    // 한 기기당 최대 30건이므로 독립적인 Cloud Tasks 요청을 함께 보내도 범위가 제한됩니다.
+    const queued = await Promise.all(
+      schedules.map(schedule => queueSchedule(schedule.id, schedule)),
+    );
+    return queued.filter(Boolean).length;
   };
 
   const prepareDailyNotifications = async () => {
@@ -154,15 +154,17 @@ const createNotificationTaskManager = ({
       .where('scheduledAt', '<', end)
       .get();
 
-    let queuedNotifications = 0;
-    for (const snapshot of scheduleSnapshot.docs) {
-      if (await queueScheduleSnapshot(snapshot)) queuedNotifications += 1;
+    // 전체 기기 예약은 많을 수 있어 100건씩 병렬 처리해 API 호출 폭주를 막습니다.
+    const queued = [];
+    for (let index = 0; index < scheduleSnapshot.docs.length; index += 100) {
+      const batch = scheduleSnapshot.docs.slice(index, index + 100);
+      queued.push(...await Promise.all(batch.map(queueScheduleSnapshot)));
     }
 
     return {
       date: day.toISODate(),
       timezone,
-      queuedNotifications,
+      queuedNotifications: queued.filter(Boolean).length,
     };
   };
 

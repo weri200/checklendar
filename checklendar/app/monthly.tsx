@@ -22,7 +22,8 @@ import {
 } from '../services/taskRepository';
 import type { Task, TaskState } from '../types/task';
 import { requestNotificationUpdate } from '../services/notificationUpdateScheduler';
-import { formatLocalDate } from '../utils/date'; 
+import { TaskDetailsModal } from '../components/TaskDetailsModal';
+import { formatLocalDate, getDateRange } from '../utils/date';
 
 interface ThemeType {
   bg: string;
@@ -36,12 +37,13 @@ interface ThemeType {
 const MENU_PANEL_OFFSET = 300;
 
 // 월별 목록에 표시할 일정 항목입니다.
-const MonthlyTaskItem = ({ item, theme, onToggle, onDelete, onEdit }: { 
+const MonthlyTaskItem = ({ item, theme, onToggle, onDelete, onEdit, onShowDetails }: {
   item: Task; 
   theme: ThemeType; 
   onToggle: (id: string) => void; 
   onDelete: (id: string) => void;
   onEdit: (id: string, currentText: string, currentRange: [string, string], currentMemo?: string) => void;
+  onShowDetails: (task: Task) => void;
 }) => {
   const swipeableRef = useRef<Swipeable>(null);
 
@@ -69,6 +71,7 @@ const MonthlyTaskItem = ({ item, theme, onToggle, onDelete, onEdit }: {
         <TouchableOpacity 
           activeOpacity={0.7} 
           onPress={() => onToggle(item.id)} 
+          onLongPress={() => onShowDetails(item)}
           style={styles.taskContent}
         >
           <View style={{ flex: 1 }}>
@@ -107,6 +110,7 @@ const MonthlyTaskItem = ({ item, theme, onToggle, onDelete, onEdit }: {
 
 export default function MonthlyScreen() {
   const { isDarkMode } = useTheme();
+  const [detailTask, setDetailTask] = useState<Task | null>(null);
   
   // 화면 상태를 관리합니다.
   const [tasks, setTasks] = useState<TaskState>({});
@@ -289,16 +293,7 @@ export default function MonthlyScreen() {
 
   const modalMarkedDates = useMemo(() => {
     const marks: { [key: string]: any } = {};
-    const range = [];
-    let curr = new Date(`${addStartDate}T00:00:00`);
-    const end = new Date(`${addEndDate}T00:00:00`);
-    while (curr <= end) {
-      const y = curr.getFullYear();
-      const m = String(curr.getMonth() + 1).padStart(2, '0');
-      const d = String(curr.getDate()).padStart(2, '0');
-      range.push(`${y}-${m}-${d}`);
-      curr.setDate(curr.getDate() + 1);
-    }
+    const range = getDateRange(addStartDate, addEndDate);
     range.forEach((d, i) => {
       marks[d] = { 
         color: i === 0 || i === range.length - 1 ? '#4A90E2' : (isDarkMode ? '#2C3E50' : '#E3F2FD'), 
@@ -310,16 +305,7 @@ export default function MonthlyScreen() {
 
   const editModalMarkedDates = useMemo(() => {
     const marks: { [key: string]: any } = {};
-    const range = [];
-    let curr = new Date(`${editStartDate}T00:00:00`);
-    const end = new Date(`${editEndDate}T00:00:00`);
-    while (curr <= end) {
-      const y = curr.getFullYear();
-      const m = String(curr.getMonth() + 1).padStart(2, '0');
-      const d = String(curr.getDate()).padStart(2, '0');
-      range.push(`${y}-${m}-${d}`);
-      curr.setDate(curr.getDate() + 1);
-    }
+    const range = getDateRange(editStartDate, editEndDate);
     range.forEach((d, i) => {
       marks[d] = { 
         color: i === 0 || i === range.length - 1 ? '#4A90E2' : (isDarkMode ? '#2C3E50' : '#E3F2FD'), 
@@ -404,6 +390,7 @@ export default function MonthlyScreen() {
               onToggle={toggleTaskCompletion} 
               onDelete={deleteTaskPermanently} 
               onEdit={openEditModal} 
+              onShowDetails={setDetailTask}
             />
           )}
 
@@ -415,6 +402,12 @@ export default function MonthlyScreen() {
         <TouchableOpacity style={styles.fab} onPress={openModal}>
           <Ionicons name="add" size={32} color="#FFF" />
         </TouchableOpacity>
+
+        <TaskDetailsModal
+          task={detailTask}
+          dark={isDarkMode}
+          onClose={() => setDetailTask(null)}
+        />
 
         {/* 새 일정 등록 모달. */}
         <Modal visible={isModalVisible} animationType="slide" presentationStyle="pageSheet">

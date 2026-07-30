@@ -5,6 +5,8 @@ import { getDateRange } from '../utils/date';
 
 const TASKS_STORAGE_KEY = '@checklendar_tasks';
 
+// 날짜별 조회를 빠르게 하려고 기간 일정은 포함된 모든 날짜에 같은 ID로 저장합니다.
+// 따라서 수정·완료·삭제는 ID가 같은 복사본 전체에 반영해야 합니다.
 export const loadTasks = async (): Promise<TaskState> => {
   const savedTasks = await AsyncStorage.getItem(TASKS_STORAGE_KEY);
   return savedTasks ? JSON.parse(savedTasks) : {};

@@ -55,9 +55,15 @@ test('오늘 발송할 예약을 지정된 시각의 Cloud Task로 생성합니�
   });
 
   const requests = [];
+  let activeRequests = 0;
+  let peakActiveRequests = 0;
   const originalCreateTask = CloudTasksClient.prototype.createTask;
   CloudTasksClient.prototype.createTask = async request => {
+    activeRequests += 1;
+    peakActiveRequests = Math.max(peakActiveRequests, activeRequests);
     requests.push(request);
+    await new Promise(resolve => setImmediate(resolve));
+    activeRequests -= 1;
     return [{}];
   };
 
@@ -71,16 +77,25 @@ test('오늘 발송할 예약을 지정된 시각의 Cloud Task로 생성합니�
 
   const manager = createManager();
   const scheduledAt = new Date(Date.now() + 1000);
-  const queuedCount = await manager.queueSchedules([{
-    id: 'schedule-1',
-    version: 'version-1',
-    scheduledAt,
-    status: 'pending',
-  }]);
+  const queuedCount = await manager.queueSchedules([
+    {
+      id: 'schedule-1',
+      version: 'version-1',
+      scheduledAt,
+      status: 'pending',
+    },
+    {
+      id: 'schedule-2',
+      version: 'version-1',
+      scheduledAt,
+      status: 'pending',
+    },
+  ]);
 
   assert.equal(manager.enabled, true);
-  assert.equal(queuedCount, 1);
-  assert.equal(requests.length, 1);
+  assert.equal(queuedCount, 2);
+  assert.equal(requests.length, 2);
+  assert.equal(peakActiveRequests, 2);
   assert.equal(
     requests[0].task.httpRequest.url,
     'https://example.run.app/internal/send-notification',

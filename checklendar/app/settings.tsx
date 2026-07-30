@@ -23,6 +23,14 @@ import {
 import { useTheme } from './_layout';
 
 const HOLIDAY_CACHE_OPTIONS = [1, 3, 5, 10];
+const SETTINGS_STORAGE_KEYS = [
+  'notiEnabled',
+  'notiTime',
+  '@main_view',
+  '@month_format',
+  HOLIDAY_CACHE_RETENTION_KEY,
+] as const;
+
 const createDefaultNotificationTime = () => {
   const defaultTime = new Date();
   defaultTime.setHours(9, 0, 0, 0);
@@ -87,11 +95,14 @@ export default function SettingsScreen() {
   // 저장된 사용자 설정을 불러옵니다.
   const loadSettings = async () => {
     try {
-      const savedEnabled = await AsyncStorage.getItem('notiEnabled');
-      const savedTime = await AsyncStorage.getItem('notiTime');
-      const savedView = await AsyncStorage.getItem('@main_view');
-      const savedMonthFormat = await AsyncStorage.getItem('@month_format');
-      const savedHolidayCacheYears = await AsyncStorage.getItem(HOLIDAY_CACHE_RETENTION_KEY);
+      // 네이티브 저장소 왕복을 한 번으로 묶어 설정 화면의 첫 표시를 빠르게 합니다.
+      const [
+        [, savedEnabled],
+        [, savedTime],
+        [, savedView],
+        [, savedMonthFormat],
+        [, savedHolidayCacheYears],
+      ] = await AsyncStorage.multiGet([...SETTINGS_STORAGE_KEYS]);
       
       if (savedEnabled !== null) setIsNotiEnabled(JSON.parse(savedEnabled));
       if (savedTime !== null) setNotiTime(new Date(savedTime));
