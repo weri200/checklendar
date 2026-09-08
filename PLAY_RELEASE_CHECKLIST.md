@@ -1,6 +1,17 @@
-# Checklendar Play 배포 체크리스트
+# Checklendar Play 업데이트 및 운영 체크리스트
 
-## Play App Signing 및 Firebase App Check
+Android 앱은 배포되어 운영 중입니다. 이 문서는 후속 업데이트 검증과 배포 설정을 확인할 때 사용합니다.
+
+## 업데이트 검증
+
+- Android 버전명과 버전 코드를 확인하고 EAS production 프로필로 AAB를 빌드합니다.
+- 내부 테스트에서 일정 등록·수정·삭제·완료 처리와 상세 팝업을 확인합니다.
+- 공휴일 조회, 알림 등록·수신, 알림 해제 후 서버 토큰·예약 삭제를 확인합니다.
+- 업데이트 배포 후 FCM·Cloud Tasks 실패 로그와 클라우드 사용량을 확인합니다.
+
+## Play App Signing 및 Firebase App Check 설정 참고
+
+아래는 초기 설정 절차입니다. 앱 서명이나 Firebase 연결을 변경할 때 참고합니다.
 
 1. EAS production 프로필로 서명된 AAB를 빌드합니다.
    - `eas build --platform android --profile production`
@@ -16,6 +27,8 @@
    - 알림 끄기 후 서버 토큰·예약 삭제
 
 ## Play Console 개인정보 항목
+
+SDK, 수집 데이터 또는 개인정보처리방침이 변경되면 아래 항목을 검토하고 갱신합니다.
 
 1. 공개된 [Checklendar 개인정보처리방침](https://gist.github.com/weri200/2c304c60607d5cafc3e89f7bf5ca2137)을 Play Console의 개인정보처리방침 URL에 입력합니다.
 2. `PLAY_DATA_SAFETY.md`의 작성안을 실제 Play Console 문항과 대조하여 제출합니다.

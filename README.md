@@ -2,10 +2,13 @@
 
 Checklendar는 달력과 체크리스트를 결합한 일정 관리 앱입니다. 일정을 날짜 범위로 관리하고, 대한민국 공휴일을 표시하며, Firebase Cloud Messaging과 Google Cloud를 이용해 서버 기반 알림을 전송하는 대학 졸업 프로젝트입니다.
 
-## 개발 현황
+현재 Android 앱은 배포되어 운영 중이며, 기능 개선과 알림 안정성·클라우드 사용량 관리를 진행합니다.
+
+## 개발·운영 현황
 
 | 영역 | 상태 | 설명 |
 | --- | --- | --- |
+| Android 앱 | 배포 완료·운영 중 | 일정 관리 및 서버 기반 알림 서비스 제공 |
 | 달력·체크리스트 | 완료 | 일정 등록, 수정, 삭제, 완료 처리 및 날짜 범위 표시 |
 | 일정 데이터 | 완료 | AsyncStorage 기반 로컬 저장 및 Repository 분리 |
 | 공휴일 | 구현 완료 | 한국천문연구원 특일 정보 API 연동, 달력 빨간 날짜 표시 |
@@ -255,7 +258,7 @@ https://checklendar-api-1045415573044.asia-northeast3.run.app
 - 예약은 기기당 최대 30개, 현재부터 31일 이내로 제한합니다.
 - Cloud Run 서비스 계정에는 Firestore, Cloud Tasks, FCM, App Check 검증에 필요한 최소 권한만 부여합니다.
 
-## 다음 작업
+## 운영 및 후속 작업
 
 - FCM·Cloud Tasks 사용량과 실패 로그 모니터링
 - iOS 알림을 지원할 경우 APNs 또는 Firebase iOS 구성을 추가
