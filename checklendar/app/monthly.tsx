@@ -23,6 +23,7 @@ import {
 import type { Task, TaskState } from '../types/task';
 import { requestNotificationUpdate } from '../services/notificationUpdateScheduler';
 import { TaskDetailsModal } from '../components/TaskDetailsModal';
+import { createMenuPanResponder } from '../utils/menuPanResponder';
 import { formatLocalDate, getDateRange } from '../utils/date';
 
 interface ThemeType {
@@ -136,6 +137,7 @@ export default function MonthlyScreen() {
   const overlayOpacity = useRef(new Animated.Value(0)).current;            
   const panelBottom = useRef(new Animated.Value(-MENU_PANEL_OFFSET)).current;
   const isMenuClosing = useRef(false);
+  const menuPanelHeight = useRef(MENU_PANEL_OFFSET);
 
   const theme = useMemo(() => ({
     bg: isDarkMode ? '#121212' : '#F8F9FA',
@@ -232,7 +234,7 @@ export default function MonthlyScreen() {
     overlayOpacity.stopAnimation();
     panelBottom.stopAnimation();
     overlayOpacity.setValue(0);
-    panelBottom.setValue(-MENU_PANEL_OFFSET);
+    panelBottom.setValue(-menuPanelHeight.current);
     setMenuVisible(true);
   }, [overlayOpacity, panelBottom]);
 
@@ -242,7 +244,7 @@ export default function MonthlyScreen() {
 
     Animated.parallel([
       Animated.timing(overlayOpacity, { toValue: 0, duration: 200, useNativeDriver: true }),
-      Animated.timing(panelBottom, { toValue: -MENU_PANEL_OFFSET, duration: 180, useNativeDriver: false }),
+      Animated.timing(panelBottom, { toValue: -menuPanelHeight.current, duration: 180, useNativeDriver: false }),
     ]).start(({ finished }) => {
       isMenuClosing.current = false;
       if (!finished) return;
@@ -253,6 +255,13 @@ export default function MonthlyScreen() {
 
   const handleCloseMenu = useCallback(() => closeMenu(), [closeMenu]);
   const handleMenuAction = useCallback((action: () => void) => closeMenu(action), [closeMenu]);
+  const menuPanResponder = useMemo(() => createMenuPanResponder({
+    panelBottom,
+    overlayOpacity,
+    panelHeight: menuPanelHeight,
+    isClosing: isMenuClosing,
+    onClose: handleCloseMenu,
+  }), [panelBottom, overlayOpacity, handleCloseMenu]);
 
   useEffect(() => {
     if (isMenuVisible) {
@@ -496,8 +505,13 @@ export default function MonthlyScreen() {
         {/* 바텀 메뉴. */}
         <Modal visible={isMenuVisible} transparent={true} animationType="none" onRequestClose={handleCloseMenu}>
           <Animated.View style={[styles.menuOverlay, { opacity: overlayOpacity }]}><TouchableOpacity style={styles.overlayTouchArea} activeOpacity={1} onPress={handleCloseMenu} /></Animated.View>
-          <Animated.View style={[styles.menuPanel, { backgroundColor: theme.card, bottom: panelBottom }]}>
-            <View style={styles.handleBar} />
+          <Animated.View
+            style={[styles.menuPanel, { backgroundColor: theme.card, bottom: panelBottom }]}
+            onLayout={({ nativeEvent }) => { menuPanelHeight.current = nativeEvent.layout.height; }}
+          >
+            <View style={styles.handleTouchArea} {...menuPanResponder.panHandlers}>
+              <View style={styles.handleBar} />
+            </View>
             <SafeAreaView edges={['bottom']} style={styles.menuSafeArea}>
               <View style={styles.menuHeader}>
                 <Text style={[styles.menuTitle, { color: theme.text }]}>메뉴</Text>
@@ -570,8 +584,9 @@ const styles = StyleSheet.create({
 
   menuOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0, 0, 0, 0.4)', zIndex: 10 },
   overlayTouchArea: { flex: 1 },
-  menuPanel: { position: 'absolute', width: '100%', borderTopLeftRadius: 30, borderTopRightRadius: 30, paddingTop: 12, zIndex: 20 },
-  handleBar: { width: 40, height: 5, backgroundColor: '#E0E0E0', borderRadius: 3, alignSelf: 'center', marginBottom: 10 },
+  menuPanel: { position: 'absolute', width: '100%', borderTopLeftRadius: 30, borderTopRightRadius: 30, zIndex: 20 },
+  handleTouchArea: { minHeight: 44, justifyContent: 'center', alignItems: 'center' },
+  handleBar: { width: 40, height: 5, backgroundColor: '#E0E0E0', borderRadius: 3, alignSelf: 'center' },
   menuSafeArea: { paddingHorizontal: 25, paddingBottom: 20 },
   menuHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 15 },
   menuTitle: { fontSize: 22, fontWeight: 'bold' },
