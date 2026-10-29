@@ -29,6 +29,9 @@ const MAX_ACTIVE_NOTIFICATION_DEVICES = Number.isInteger(configuredActiveDeviceL
 const DUE_NOTIFICATION_LIMIT = 100;
 const PROCESSING_LEASE_MS = 5 * 60 * 1000;
 const MAX_SCHEDULE_AHEAD_MS = 31 * 24 * 60 * 60 * 1000;
+// 앱을 지운 기기의 토큰이 활성 기기 상한을 계속 차지하지 않도록 Firestore TTL로 만료시킵니다.
+const TOKEN_TTL_MS = 60 * 24 * 60 * 60 * 1000;
+const createTokenExpireAt = () => admin.firestore.Timestamp.fromMillis(Date.now() + TOKEN_TTL_MS);
 
 const tokenCollection = db.collection('pushTokens');
 const scheduleCollection = db.collection('scheduledNotifications');
@@ -153,6 +156,7 @@ app.post('/api/register-token', mutationRateLimit, async (req, res) => {
         active: true,
         deactivatedAt: admin.firestore.FieldValue.delete(),
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        expireAt: createTokenExpireAt(),
       },
     });
 
@@ -256,6 +260,7 @@ app.put('/api/notification-schedule', mutationRateLimit, async (req, res) => {
     batch.update(tokenCollection.doc(token), {
       timezone: typeof timezone === 'string' ? timezone.slice(0, 100) : null,
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      expireAt: createTokenExpireAt(),
     });
 
     await batch.commit();

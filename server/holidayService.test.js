@@ -29,3 +29,12 @@ test('API 오류 응답은 예외로 처리한다', () => {
   const xml = '<response><header><resultCode>30</resultCode><resultMsg>SERVICE KEY ERROR</resultMsg></header></response>';
   assert.throws(() => parseHolidayXml(xml), /SERVICE KEY ERROR/);
 });
+
+test('resultCode가 없는 공통 오류 응답을 빈 공휴일 목록으로 처리하지 않는다', () => {
+  const xml = `
+    <OpenAPI_ServiceResponse><cmmMsgHeader><errMsg>SERVICE ERROR</errMsg>
+      <returnAuthMsg>SERVICE_KEY_IS_NOT_REGISTERED_ERROR</returnAuthMsg>
+      <returnReasonCode>30</returnReasonCode>
+    </cmmMsgHeader></OpenAPI_ServiceResponse>`;
+  assert.throws(() => parseHolidayXml(xml), /SERVICE_KEY_IS_NOT_REGISTERED_ERROR/);
+});

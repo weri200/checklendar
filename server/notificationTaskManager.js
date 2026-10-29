@@ -2,6 +2,8 @@ const crypto = require('crypto');
 const { CloudTasksClient } = require('@google-cloud/tasks');
 const { DateTime } = require('luxon');
 
+const LATE_QUEUE_GRACE_MS = 15 * 60 * 1000;
+
 const createNotificationTaskManager = ({
   admin,
   messaging,
@@ -99,7 +101,8 @@ const createNotificationTaskManager = ({
       data.status !== 'pending'
       || !data.version
       || !(scheduledAt instanceof Date)
-      || scheduledAt.getTime() <= Date.now()
+      // 자정 준비 호출이 몇 초 늦어도 00:00 예약이 빠지지 않도록 최근에 지난 예약도 등록합니다.
+      || scheduledAt.getTime() <= Date.now() - LATE_QUEUE_GRACE_MS
       || !isToday(scheduledAt)
     ) {
       return false;

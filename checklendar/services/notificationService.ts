@@ -75,7 +75,10 @@ const requestJson = async (path: string, init: RequestInit): Promise<void> => {
 
     if (!response.ok) {
       const responseBody = await response.text();
-      throw new Error(`서버 요청 실패 (${response.status}): ${responseBody}`);
+      throw Object.assign(
+        new Error(`서버 요청 실패 (${response.status}): ${responseBody}`),
+        { status: response.status },
+      );
     }
   } catch (error) {
     if (error instanceof Error && error.name === 'AbortError') {
@@ -278,6 +281,10 @@ const performNotificationScheduleSync = async ({ force = true }: NotificationSch
     console.log(`서버 알림 일정 ${notifications.length}건 동기화 완료`);
   } catch (error) {
     console.error('서버 알림 일정 동기화 실패:', error);
+    // 서버에서 토큰이 삭제됐다면 저장된 등록 정보를 지워 다음 앱 복귀 때 다시 등록합니다.
+    if ((error as { status?: number }).status === 403) {
+      await AsyncStorage.multiRemove([REGISTERED_TOKEN_KEY, LAST_NOTIFICATION_SYNC_KEY]);
+    }
   }
 };
 

@@ -90,12 +90,26 @@ test('오늘 발송할 예약을 지정된 시각의 Cloud Task로 생성합니�
       scheduledAt,
       status: 'pending',
     },
+    // 자정 준비 호출이 늦게 도착해 방금 지난 예약도 등록합니다.
+    {
+      id: 'schedule-just-passed',
+      version: 'version-1',
+      scheduledAt: new Date(Date.now() - 1000),
+      status: 'pending',
+    },
+    {
+      id: 'schedule-long-passed',
+      version: 'version-1',
+      scheduledAt: new Date(Date.now() - 20 * 60 * 1000),
+      status: 'pending',
+    },
   ]);
 
   assert.equal(manager.enabled, true);
-  assert.equal(queuedCount, 2);
-  assert.equal(requests.length, 2);
-  assert.equal(peakActiveRequests, 2);
+  assert.equal(queuedCount, 3);
+  assert.equal(requests.length, 3);
+  assert.equal(peakActiveRequests, 3);
+  assert.ok(requests[2].task.name.includes('schedule-just-passed'));
   assert.equal(
     requests[0].task.httpRequest.url,
     'https://example.run.app/internal/send-notification',

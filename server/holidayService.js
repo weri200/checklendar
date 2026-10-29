@@ -34,8 +34,10 @@ const readTag = (xml, tag) => {
 // 공공데이터포털의 연도별 XML 응답을 앱에서 사용하기 쉬운 배열로 변환합니다.
 const parseHolidayXml = xml => {
   const resultCode = readTag(xml, 'resultCode');
-  if (resultCode && resultCode !== '00') {
-    throw new Error(`공휴일 API 오류 (${resultCode}): ${readTag(xml, 'resultMsg') || '알 수 없는 오류'}`);
+  // 인증키 만료 같은 공통 오류 응답에는 resultCode가 없으므로 빈 목록으로 캐시하지 않고 오류로 처리합니다.
+  if (resultCode !== '00') {
+    const message = readTag(xml, 'resultMsg') || readTag(xml, 'returnAuthMsg') || '알 수 없는 오류';
+    throw new Error(`공휴일 API 오류 (${resultCode || readTag(xml, 'returnReasonCode')}): ${message}`);
   }
 
   return [...xml.matchAll(/<item>([\s\S]*?)<\/item>/g)].flatMap(match => {
