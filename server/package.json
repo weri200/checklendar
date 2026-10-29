@@ -4,8 +4,8 @@
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
-    "check": "node --check index.js && node --check appCheckMiddleware.js && node --check rateLimitMiddleware.js && node --check notificationTaskManager.js && node --check holidayService.js && node --check deviceRegistration.js",
-    "test": "node --test appCheckMiddleware.test.js rateLimitMiddleware.test.js notificationTaskManager.test.js holidayService.test.js deviceRegistration.test.js"
+    "check": "node --check index.js && node --check appCheckMiddleware.js && node --check rateLimitMiddleware.js && node --check notificationTaskManager.js && node --check holidayService.js && node --check deviceRegistration.js && node --check backfillTokenExpireAt.js",
+    "test": "node --test appCheckMiddleware.test.js rateLimitMiddleware.test.js notificationTaskManager.test.js holidayService.test.js deviceRegistration.test.js backfillTokenExpireAt.test.js"
   },
   "keywords": [],
   "author": "",

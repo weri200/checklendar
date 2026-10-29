@@ -9,6 +9,7 @@ const { createAppCheckMiddleware } = require('./appCheckMiddleware');
 const { createRateLimiter } = require('./rateLimitMiddleware');
 const {
   ACTIVE_DEVICE_LIMIT_REACHED,
+  TOKEN_TTL_MS,
   createDeviceRegistrationManager,
 } = require('./deviceRegistration');
 require('dotenv').config();
@@ -29,8 +30,6 @@ const MAX_ACTIVE_NOTIFICATION_DEVICES = Number.isInteger(configuredActiveDeviceL
 const DUE_NOTIFICATION_LIMIT = 100;
 const PROCESSING_LEASE_MS = 5 * 60 * 1000;
 const MAX_SCHEDULE_AHEAD_MS = 31 * 24 * 60 * 60 * 1000;
-// 앱을 지운 기기의 토큰이 활성 기기 상한을 계속 차지하지 않도록 Firestore TTL로 만료시킵니다.
-const TOKEN_TTL_MS = 60 * 24 * 60 * 60 * 1000;
 const createTokenExpireAt = () => admin.firestore.Timestamp.fromMillis(Date.now() + TOKEN_TTL_MS);
 
 const tokenCollection = db.collection('pushTokens');

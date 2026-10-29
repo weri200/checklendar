@@ -177,7 +177,7 @@ EXPO_PUBLIC_PUSH_SERVER_URL=https://your-cloud-run-service.run.app
 
 이 주소는 공휴일 API와 푸시 알림 API가 함께 사용합니다. `.env`는 Git에 포함하지 않습니다.
 
-Android 빌드에는 `checklendar/google-services.json`이 필요합니다. 개발 빌드는 Firebase Console에 등록한 App Check 디버그 토큰을 `.env.local`의 `EXPO_PUBLIC_FIREBASE_APP_CHECK_DEBUG_TOKEN`에 설정합니다. 릴리스 빌드는 Play Integrity를 사용합니다. 설정 예시는 [`checklendar/.env.example`](checklendar/.env.example), 서명·App Check 연결 절차는 [Play 체크리스트](PLAY_RELEASE_CHECKLIST.md)를 참고합니다.
+Android 빌드에는 Firebase Console에서 받은 `google-services.json`을 `checklendar/google-services.json`과 `checklendar/android/app/google-services.json` 두 곳에 두어야 합니다. 저장소에 `android/` 폴더가 포함되어 있어 빌드할 때 prebuild가 실행되지 않으므로, Gradle은 `android/app/` 위치의 파일만 읽습니다. 두 파일 모두 Git에서 제외되며 `.easignore` 예외로 EAS 빌드에는 포함됩니다. 개발 빌드는 Firebase Console에 등록한 App Check 디버그 토큰을 `.env.local`의 `EXPO_PUBLIC_FIREBASE_APP_CHECK_DEBUG_TOKEN`에 설정합니다. 릴리스 빌드는 Play Integrity를 사용합니다. 설정 예시는 [`checklendar/.env.example`](checklendar/.env.example), 서명·App Check 연결 절차는 [Play 체크리스트](PLAY_RELEASE_CHECKLIST.md)를 참고합니다.
 
 ### 2. 로컬 서버 환경변수
 

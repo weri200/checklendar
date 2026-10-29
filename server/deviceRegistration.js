@@ -1,4 +1,6 @@
 const ACTIVE_DEVICE_LIMIT_REACHED = 'ACTIVE_DEVICE_LIMIT_REACHED';
+// 앱을 지운 기기의 토큰이 활성 기기 상한을 계속 차지하지 않도록 Firestore TTL로 만료시킵니다.
+const TOKEN_TTL_MS = 60 * 24 * 60 * 60 * 1000;
 
 const createDeviceRegistrationManager = ({
   db,
@@ -81,5 +83,6 @@ const createDeviceRegistrationManager = ({
 
 module.exports = {
   ACTIVE_DEVICE_LIMIT_REACHED,
+  TOKEN_TTL_MS,
   createDeviceRegistrationManager,
 };

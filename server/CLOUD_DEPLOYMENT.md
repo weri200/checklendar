@@ -137,14 +137,30 @@ gcloud scheduler jobs create http checklendar-daily-notifications \
 Firestore TTL 정책을 켭니다. 만료된 문서는 보통 24시간 안에 삭제되며, 남은 예약은 발송 시점에
 토큰이 없음을 확인하고 삭제됩니다. 삭제된 기기가 다시 앱을 열면 앱이 토큰을 다시 등록합니다.
 
-```bash
-gcloud firestore fields ttls update expireAt \
-  --collection-group=pushTokens \
-  --enable-ttl \
-  --project=checklendar-e5327
-```
+재등록은 앱 1.6.5부터 지원하므로, 아래 작업은 1.6.5 업데이트가 대부분의 기기에 퍼진 뒤 진행합니다.
+그 전에 TTL을 켜면 이전 버전 앱은 토큰이 삭제된 뒤 다시 등록하지 않아 알림이 끊깁니다.
 
-`expireAt`이 없는 기존 문서는 TTL 대상이 아니므로, 해당 기기가 다음에 동기화할 때 값이 채워집니다.
+1. `expireAt` 도입 전에 만든 토큰 문서는 TTL 대상이 아니므로 한 번 채웁니다. 앱을 지운 기기의
+   토큰은 다시 동기화하지 않아 이 작업 없이는 계속 남습니다. `expireAt`은 마지막 갱신 시각부터
+   60일 뒤로 계산하며, 기본 실행은 대상 건수만 출력하고 `--apply`를 붙여야 기록합니다.
+
+   ```bash
+   cd server
+   node backfillTokenExpireAt.js
+   node backfillTokenExpireAt.js --apply
+   ```
+
+   로컬 `server/.env`의 `GOOGLE_APPLICATION_CREDENTIALS` 또는
+   `gcloud auth application-default login` 자격 증명으로 `checklendar-e5327` 프로젝트에 접근합니다.
+
+2. TTL 정책을 켭니다.
+
+   ```bash
+   gcloud firestore fields ttls update expireAt \
+     --collection-group=pushTokens \
+     --enable-ttl \
+     --project=checklendar-e5327
+   ```
 
 ## 수동 확인
 
